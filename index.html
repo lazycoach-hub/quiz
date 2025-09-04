@@ -100,25 +100,49 @@
     }
 
     function showResults() {
-        const container = document.getElementById('result-container');
-        const total = Object.values(scores).reduce((a, b) => a + b, 0);
-        container.innerHTML = '<h3>Your Sales Attachment Style Breakdown:</h3>';
-        for (const style in scores) {
-            const percent = Math.round((scores[style] / total) * 100);
-            container.innerHTML += '<div class="bar" style="background: ' + getColor(style) + '; width:' + percent + '%;"><span>' + style + ' (' + percent + '%)</span></div>';
-        }
+    const container = document.getElementById('result-container');
+    const total = Object.values(scores).reduce((a, b) => a + b, 0);
+    container.innerHTML = '<h3>Your Sales Attachment Style Breakdown:</h3>';
 
-        // Instruction text above opt-in
-        container.innerHTML += '<div class="optin-instruction">Enter your details below to get the full breakdown and understand your results:</div>';
+    for (const style in scores) {
+        const percent = Math.round((scores[style] / total) * 100);
+        
+        // Add text label above the bar
+        const label = document.createElement('div');
+        label.textContent = `${style} — ${percent}%`;
+        label.style.fontWeight = 'bold';
+        label.style.marginTop = '20px';
+        label.style.color = 'black';
 
-        // Insert Kartra opt-in form
-        container.innerHTML += '<div class="kartra_optin_containerb53b3a3d6ab90ce0268229151c9bde11"></div>';
-        const script = document.createElement('script');
-        script.src = "https://app.kartra.com/optin/MO8F9KUv20lF";
-        document.body.appendChild(script);
+        // Create the bar itself (with no text inside)
+        const bar = document.createElement('div');
+        bar.className = 'bar';
+        bar.style.background = getColor(style);
+        bar.style.width = percent + '%';
+        bar.style.height = '20px';
+        bar.style.borderRadius = '5px';
 
-        document.getElementById('quiz-container').innerHTML = '';
+        container.appendChild(label);
+        container.appendChild(bar);
     }
+
+    // Instruction text above opt-in
+    const optinInstruction = document.createElement('div');
+    optinInstruction.className = 'optin-instruction';
+    optinInstruction.textContent = "Enter your details below to get the full breakdown and understand your results:";
+    container.appendChild(optinInstruction);
+
+    // Insert Kartra opt-in form
+    const kartraDiv = document.createElement('div');
+    kartraDiv.className = 'kartra_optin_containerb53b3a3d6ab90ce0268229151c9bde11';
+    container.appendChild(kartraDiv);
+
+    const script = document.createElement('script');
+    script.src = "https://app.kartra.com/optin/MO8F9KUv20lF";
+    document.body.appendChild(script);
+
+    document.getElementById('quiz-container').innerHTML = '';
+}
 
     function getColor(style) {
         return { Righteous: '#d9534f', Independent: '#5bc0de', Prestige: '#f0ad4e', Adaptive: '#5cb85c' }[style];
