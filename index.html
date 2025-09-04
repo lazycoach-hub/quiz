@@ -1,145 +1,163 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
   <title>Sales Attachment Style Quiz</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      padding: 20px;
-      max-width: 700px;
-      margin: 0 auto;
-      line-height: 1.6;
-    }
-    h1, h2 {
-      text-align: center;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 0 20px;
     }
     .question {
       margin-bottom: 20px;
     }
-    .result {
+    .hidden {
+      display: none;
+    }
+    #result {
       margin-top: 30px;
       padding: 15px;
-      border: 1px solid #ccc;
-      background-color: #f9f9f9;
+      background-color: #f0f0f0;
+      border-radius: 5px;
     }
-    .optin-section {
-      margin-top: 50px;
+    h1, h2 {
       text-align: center;
+    }
+    .kartra-optin {
+      margin-top: 40px;
     }
   </style>
 </head>
 <body>
-  <h1>Sales Attachment Style Quiz</h1>
 
-  <form id="quiz-form">
-    <div class="question">
-      <p>1. I enjoy sharing my work with others, even if it doesn't lead to a sale.</p>
-      <label><input type="radio" name="q1" value="adaptive"> Strongly Agree</label><br/>
-      <label><input type="radio" name="q1" value="independent"> Strongly Disagree</label><br/>
-      <label><input type="radio" name="q1" value="righteous"> Agree</label><br/>
-      <label><input type="radio" name="q1" value="desirable"> Neutral</label>
+  <h1>What's Your Sales Attachment Style?</h1>
+
+  <div id="quiz"></div>
+
+  <button id="submit">Submit Quiz</button>
+
+  <div id="result" class="hidden">
+    <h2>Your Results</h2>
+    <p id="styleBreakdown"></p>
+
+    <div class="kartra-optin">
+      <p>Enter your details below to get the full breakdown and understand your results.</p>
+
+      <!-- Start of Kartra Opt-In Embed Code -->
+      <div class="optin-form-container" data-kw="your-kartra-code">
+        <form method="post" action="https://app.kartra.com/redirect_to_kartra_optin_url" id="kartra_form" data-kwform="true">
+          
+          <input type="hidden" name="independent_percentage" id="kartra_independent">
+          <input type="hidden" name="righteous_percentage" id="kartra_righteous">
+          <input type="hidden" name="prestige_percentage" id="kartra_prestige">
+          <input type="hidden" name="adaptive_percentage" id="kartra_adaptive">
+
+          <label for="name">Name:</label><br>
+          <input type="text" name="name" required><br><br>
+
+          <label for="email">Email:</label><br>
+          <input type="email" name="email" required><br><br>
+
+          <input type="submit" value="Get My Full Report">
+        </form>
+      </div>
+      <!-- End of Kartra Opt-In Embed Code -->
     </div>
-    <!-- Add more questions like above here -->
-    <button type="submit">Get My Style</button>
-  </form>
-
-  <div id="result" class="result" style="display: none;"></div>
-
-  <div id="optin-section" class="optin-section" style="display: none;">
-    <h2>Enter your details below to get the full breakdown and understand your results</h2>
-
-    <!-- BEGIN KARTRA FORM -->
-    <div class="kartra_optin_container">
-      <div id="K-FRM_IDbJDnEsY" class="kartra_optin_position_left K-FRM_IDbJDnEsY"></div>
-      <script src="https://app.kartra.com/resources/js/form.embed.js"></script>
-      <script>
-        window.onload = function () {
-          const resultDiv = document.getElementById('result');
-          const adaptive = document.createElement('input');
-          const independent = document.createElement('input');
-          const righteous = document.createElement('input');
-          const desirable = document.createElement('input');
-
-          [adaptive, independent, righteous, desirable].forEach(input => {
-            input.type = 'hidden';
-            input.name = '';
-            input.className = 'custom_field'; // Required by Kartra
-          });
-
-          adaptive.name = 'adaptiveScore';
-          independent.name = 'independentScore';
-          righteous.name = 'righteousScore';
-          desirable.name = 'desirableScore';
-
-          const observer = new MutationObserver(() => {
-            const form = document.querySelector('.kartra_optin_position_left form');
-            if (form && !form.querySelector('[name="adaptiveScore"]')) {
-              form.appendChild(adaptive);
-              form.appendChild(independent);
-              form.appendChild(righteous);
-              form.appendChild(desirable);
-            }
-          });
-
-          observer.observe(document.body, { childList: true, subtree: true });
-
-          window.populateHiddenFields = function (scores) {
-            adaptive.value = scores.adaptive;
-            independent.value = scores.independent;
-            righteous.value = scores.righteous;
-            desirable.value = scores.desirable;
-          };
-        };
-      </script>
-    </div>
-    <!-- END KARTRA FORM -->
-
   </div>
 
   <script>
-    document.getElementById("quiz-form").addEventListener("submit", function(e) {
-      e.preventDefault();
+    const questions = [
+      {
+        question: "I avoid following up with leads because I don't want to seem pushy.",
+        scores: { Independent: 2, Righteous: 0, Prestige: 0, Adaptive: 0 }
+      },
+      {
+        question: "I often think my competitors are unethical or fake.",
+        scores: { Independent: 0, Righteous: 2, Prestige: 0, Adaptive: 0 }
+      },
+      {
+        question: "I want my offers to be seen as high-value, even if people don’t buy.",
+        scores: { Independent: 0, Righteous: 0, Prestige: 2, Adaptive: 0 }
+      },
+      {
+        question: "I enjoy sharing my work even if it doesn’t lead to a sale.",
+        scores: { Independent: 0, Righteous: 0, Prestige: 0, Adaptive: 2 }
+      },
+      {
+        question: "I delay launching things until I feel fully ready.",
+        scores: { Independent: 2, Righteous: 0, Prestige: 0, Adaptive: 0 }
+      },
+      {
+        question: "I feel disillusioned with the coaching or healing industry.",
+        scores: { Independent: 0, Righteous: 2, Prestige: 0, Adaptive: 0 }
+      },
+      {
+        question: "People should be able to see how good I am without me needing to sell.",
+        scores: { Independent: 0, Righteous: 0, Prestige: 2, Adaptive: 0 }
+      }
+    ];
 
-      const answers = document.querySelectorAll("input[type=radio]:checked");
-      const counts = {
-        adaptive: 0,
-        independent: 0,
-        righteous: 0,
-        desirable: 0,
-      };
+    const quizDiv = document.getElementById('quiz');
+    const resultDiv = document.getElementById('result');
+    const styleBreakdown = document.getElementById('styleBreakdown');
 
-      answers.forEach(ans => {
-        if (counts[ans.value] !== undefined) {
-          counts[ans.value]++;
+    questions.forEach((q, i) => {
+      const div = document.createElement('div');
+      div.classList.add('question');
+      div.innerHTML = `<p><strong>Q${i + 1}:</strong> ${q.question}</p>
+        <label><input type="radio" name="q${i}" value="0"> Strongly Disagree</label><br>
+        <label><input type="radio" name="q${i}" value="1"> Disagree</label><br>
+        <label><input type="radio" name="q${i}" value="2"> Agree</label><br>
+        <label><input type="radio" name="q${i}" value="3"> Strongly Agree</label>`;
+      quizDiv.appendChild(div);
+    });
+
+    document.getElementById('submit').addEventListener('click', () => {
+      const scores = { Independent: 0, Righteous: 0, Prestige: 0, Adaptive: 0 };
+      let answered = 0;
+
+      questions.forEach((q, i) => {
+        const val = document.querySelector(`input[name="q${i}"]:checked`);
+        if (val) {
+          answered++;
+          const multiplier = parseInt(val.value);
+          for (let style in q.scores) {
+            scores[style] += q.scores[style] * multiplier;
+          }
         }
       });
 
-      const total = Object.values(counts).reduce((a, b) => a + b, 0);
-      const ratios = {
-        adaptive: ((counts.adaptive / total) * 100).toFixed(1),
-        independent: ((counts.independent / total) * 100).toFixed(1),
-        righteous: ((counts.righteous / total) * 100).toFixed(1),
-        desirable: ((counts.desirable / total) * 100).toFixed(1)
-      };
-
-      const resultDiv = document.getElementById("result");
-      resultDiv.innerHTML = `
-        <h2>Your Sales Attachment Style Breakdown</h2>
-        <p><strong>Adaptive:</strong> ${ratios.adaptive}%</p>
-        <p><strong>Independent:</strong> ${ratios.independent}%</p>
-        <p><strong>Righteous:</strong> ${ratios.righteous}%</p>
-        <p><strong>Desirable:</strong> ${ratios.desirable}%</p>
-      `;
-      resultDiv.style.display = "block";
-
-      document.getElementById("optin-section").style.display = "block";
-
-      // Populate hidden fields for Kartra form
-      if (typeof window.populateHiddenFields === "function") {
-        window.populateHiddenFields(ratios);
+      if (answered < questions.length) {
+        alert("Please answer all questions.");
+        return;
       }
+
+      // Calculate percentages
+      const total = Object.values(scores).reduce((a, b) => a + b, 0);
+      const percentages = {};
+      for (let style in scores) {
+        percentages[style] = Math.round((scores[style] / total) * 100);
+      }
+
+      // Show results
+      styleBreakdown.innerHTML = `
+        <strong>Independent:</strong> ${percentages.Independent}%<br>
+        <strong>Righteous:</strong> ${percentages.Righteous}%<br>
+        <strong>Prestige:</strong> ${percentages.Prestige}%<br>
+        <strong>Adaptive:</strong> ${percentages.Adaptive}%<br>
+      `;
+
+      // Populate Kartra hidden fields
+      document.getElementById('kartra_independent').value = percentages.Independent;
+      document.getElementById('kartra_righteous').value = percentages.Righteous;
+      document.getElementById('kartra_prestige').value = percentages.Prestige;
+      document.getElementById('kartra_adaptive').value = percentages.Adaptive;
+
+      // Reveal result section
+      resultDiv.classList.remove('hidden');
+      window.scrollTo({ top: resultDiv.offsetTop, behavior: 'smooth' });
     });
   </script>
 </body>
