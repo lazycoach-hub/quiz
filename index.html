@@ -1,164 +1,120 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Sales Attachment Style Quiz</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 600px;
-      margin: 40px auto;
-      padding: 0 20px;
-    }
-    .question {
-      margin-bottom: 20px;
-    }
-    .hidden {
-      display: none;
-    }
-    #result {
-      margin-top: 30px;
-      padding: 15px;
-      background-color: #f0f0f0;
-      border-radius: 5px;
-    }
-    h1, h2 {
-      text-align: center;
-    }
-    .kartra-optin {
-      margin-top: 40px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>Sales Attachment Style Quiz</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+        .question { margin-bottom: 20px; }
+        .answers button { display: block; margin: 5px 0; padding: 10px; width: 100%; cursor: pointer; }
+        .result { margin-top: 30px; }
+        .bar { height: 30px; background: lightgray; margin: 10px 0; position: relative; border-radius: 5px; }
+        .bar span { position: absolute; left: 10px; color: white; font-weight: bold; line-height: 30px; }
+    </style>
 </head>
 <body>
 
-  <h1>What's Your Sales Attachment Style?</h1>
+<h2>Sales Attachment Style Quiz</h2>
 
-  <div id="quiz"></div>
+<div id="quiz-container"></div>
+<div id="result-container" class="result"></div>
 
-  <button id="submit">Submit Quiz</button>
-
-  <div id="result" class="hidden">
-    <h2>Your Results</h2>
-    <p id="styleBreakdown"></p>
-
-    <div class="kartra-optin">
-      <p>Enter your details below to get the full breakdown and understand your results.</p>
-
-      <!-- Start of Kartra Opt-In Embed Code -->
-      <div class="optin-form-container" data-kw="your-kartra-code">
-        <form method="post" action="https://app.kartra.com/redirect_to_kartra_optin_url" id="kartra_form" data-kwform="true">
-          
-          <input type="hidden" name="independent_percentage" id="kartra_independent">
-          <input type="hidden" name="righteous_percentage" id="kartra_righteous">
-          <input type="hidden" name="prestige_percentage" id="kartra_prestige">
-          <input type="hidden" name="adaptive_percentage" id="kartra_adaptive">
-
-          <label for="name">Name:</label><br>
-          <input type="text" name="name" required><br><br>
-
-          <label for="email">Email:</label><br>
-          <input type="email" name="email" required><br><br>
-
-          <input type="submit" value="Get My Full Report">
-        </form>
-      </div>
-      <!-- End of Kartra Opt-In Embed Code -->
-    </div>
-  </div>
-
-  <script>
-    const questions = [
-      {
-        question: "I avoid following up with leads because I don't want to seem pushy.",
-        scores: { Independent: 2, Righteous: 0, Prestige: 0, Adaptive: 0 }
-      },
-      {
-        question: "I often think my competitors are unethical or fake.",
-        scores: { Independent: 0, Righteous: 2, Prestige: 0, Adaptive: 0 }
-      },
-      {
-        question: "I want my offers to be seen as high-value, even if people don’t buy.",
-        scores: { Independent: 0, Righteous: 0, Prestige: 2, Adaptive: 0 }
-      },
-      {
-        question: "I enjoy sharing my work even if it doesn’t lead to a sale.",
-        scores: { Independent: 0, Righteous: 0, Prestige: 0, Adaptive: 2 }
-      },
-      {
-        question: "I delay launching things until I feel fully ready.",
-        scores: { Independent: 2, Righteous: 0, Prestige: 0, Adaptive: 0 }
-      },
-      {
-        question: "I feel disillusioned with the coaching or healing industry.",
-        scores: { Independent: 0, Righteous: 2, Prestige: 0, Adaptive: 0 }
-      },
-      {
-        question: "People should be able to see how good I am without me needing to sell.",
-        scores: { Independent: 0, Righteous: 0, Prestige: 2, Adaptive: 0 }
-      }
+<script>
+    const quizData = [
+        { question: "When someone chooses not to buy from you, how do you feel deep down?",
+            answers: [
+                { text: "I move on, no big deal.", style: "Prestige" },
+                { text: "Was I too pushy?", style: "Independent" },
+                { text: "Good luck to them.", style: "Righteous" },
+                { text: "That's a shame, but I'm OK.", style: "Adaptive" }
+            ]},
+        { question: "How do you feel about following up with people who've shown some interest but haven't bought yet?",
+            answers: [
+                { text: "I don't believe in chasing. If they see the value, they'll come to me.", style: "Prestige" },
+                { text: "If they were interested, they'd have reached out by now. I don't want to appear pushy.", style: "Independent" },
+                { text: "This is my opportunity to show them why I'm different and better.", style: "Righteous" },
+                { text: "Follow-up isn't ideal, but it's a necessary process.", style: "Adaptive" }
+            ]},
+        { question: "What comes to mind when you think about your pricing?",
+            answers: [
+                { text: "I price according to my worth and the value I bring.", style: "Prestige" },
+                { text: "I know the value of my offer, but I'm still worried charging too much might put people off.", style: "Independent" },
+                { text: "I'm fair, but my products are the best in the market, and I charge accordingly.", style: "Righteous" },
+                { text: "We test our pricing and adjust if needed based on demand.", style: "Adaptive" }
+            ]},
+        { question: "What do you tend to do before speaking to an interested potential client?",
+            answers: [
+                { text: "I spend time connecting with my own value, reminding myself of my own worth.", style: "Prestige" },
+                { text: "Honestly, I hate these calls. I wish people would just buy without me having to convince them.", style: "Independent" },
+                { text: "This is my chance to show them what high standards look like.", style: "Righteous" },
+                { text: "I review my notes, consider where the client is at, and prepare to offer solutions.", style: "Adaptive" }
+            ]},
+        { question: "When you see the big players in your field doing well, what do you usually think?",
+            answers: [
+                { text: "I only pay attention to high-value competition and learn from them.", style: "Prestige" },
+                { text: "I try not to pay attention to what others are doing, otherwise it can become overwhelming.", style: "Independent" },
+                { text: "They might be doing well, but their product is not as good as ours.", style: "Righteous" },
+                { text: "I only look at others if there's a specific strategy we're looking to model.", style: "Adaptive" }
+            ]},
+        { question: "When someone chooses a competitor instead of you, you assume...",
+            answers: [
+                { text: "No big deal, I move on.", style: "Prestige" },
+                { text: "Was I too pushy?", style: "Independent" },
+                { text: "Good luck to them.", style: "Righteous" },
+                { text: "That's a shame, but I'm OK.", style: "Adaptive" }
+            ]},
+        { question: "When considering how you sell and market yourself, which of these feels most true for you?",
+            answers: [
+                { text: "It's all about brand and being seen as premium.", style: "Prestige" },
+                { text: "It's all about showing up and doing your thing; the right people will come.", style: "Independent" },
+                { text: "It's all about integrity and communicating that.", style: "Righteous" },
+                { text: "It's all about understanding the client and showing them that.", style: "Adaptive" }
+            ]}
     ];
 
-    const quizDiv = document.getElementById('quiz');
-    const resultDiv = document.getElementById('result');
-    const styleBreakdown = document.getElementById('styleBreakdown');
+    const scores = { Righteous: 0, Independent: 0, Prestige: 0, Adaptive: 0 };
+    let currentQuestion = 0;
 
-    questions.forEach((q, i) => {
-      const div = document.createElement('div');
-      div.classList.add('question');
-      div.innerHTML = `<p><strong>Q${i + 1}:</strong> ${q.question}</p>
-        <label><input type="radio" name="q${i}" value="0"> Strongly Disagree</label><br>
-        <label><input type="radio" name="q${i}" value="1"> Disagree</label><br>
-        <label><input type="radio" name="q${i}" value="2"> Agree</label><br>
-        <label><input type="radio" name="q${i}" value="3"> Strongly Agree</label>`;
-      quizDiv.appendChild(div);
-    });
+    function renderQuestion() {
+        const q = quizData[currentQuestion];
+        const container = document.getElementById('quiz-container');
+        container.innerHTML = '<div class="question"><h3>' + q.question + '</h3></div><div class="answers"></div>';
+        const answersDiv = container.querySelector('.answers');
+        q.answers.forEach((a) => {
+            const btn = document.createElement('button');
+            btn.textContent = a.text;
+            btn.onclick = () => selectAnswer(a.style);
+            answersDiv.appendChild(btn);
+        });
+    }
 
-    document.getElementById('submit').addEventListener('click', () => {
-      const scores = { Independent: 0, Righteous: 0, Prestige: 0, Adaptive: 0 };
-      let answered = 0;
-
-      questions.forEach((q, i) => {
-        const val = document.querySelector(`input[name="q${i}"]:checked`);
-        if (val) {
-          answered++;
-          const multiplier = parseInt(val.value);
-          for (let style in q.scores) {
-            scores[style] += q.scores[style] * multiplier;
-          }
+    function selectAnswer(style) {
+        scores[style]++;
+        currentQuestion++;
+        if (currentQuestion < quizData.length) {
+            renderQuestion();
+        } else {
+            showResults();
         }
-      });
+    }
 
-      if (answered < questions.length) {
-        alert("Please answer all questions.");
-        return;
-      }
+    function showResults() {
+        const container = document.getElementById('result-container');
+        const total = Object.values(scores).reduce((a, b) => a + b, 0);
+        container.innerHTML = '<h3>Your Sales Attachment Style Breakdown:</h3>';
+        for (const style in scores) {
+            const percent = Math.round((scores[style] / total) * 100);
+            container.innerHTML += '<div class="bar" style="background: ' + getColor(style) + '; width:' + percent + '%;"><span>' + style + ' (' + percent + '%)</span></div>';
+        }
+        document.getElementById('quiz-container').innerHTML = '';
+    }
 
-      // Calculate percentages
-      const total = Object.values(scores).reduce((a, b) => a + b, 0);
-      const percentages = {};
-      for (let style in scores) {
-        percentages[style] = Math.round((scores[style] / total) * 100);
-      }
+    function getColor(style) {
+        return { Righteous: '#d9534f', Independent: '#5bc0de', Prestige: '#f0ad4e', Adaptive: '#5cb85c' }[style];
+    }
 
-      // Show results
-      styleBreakdown.innerHTML = `
-        <strong>Independent:</strong> ${percentages.Independent}%<br>
-        <strong>Righteous:</strong> ${percentages.Righteous}%<br>
-        <strong>Prestige:</strong> ${percentages.Prestige}%<br>
-        <strong>Adaptive:</strong> ${percentages.Adaptive}%<br>
-      `;
+    renderQuestion();
+</script>
 
-      // Populate Kartra hidden fields
-      document.getElementById('kartra_independent').value = percentages.Independent;
-      document.getElementById('kartra_righteous').value = percentages.Righteous;
-      document.getElementById('kartra_prestige').value = percentages.Prestige;
-      document.getElementById('kartra_adaptive').value = percentages.Adaptive;
-
-      // Reveal result section
-      resultDiv.classList.remove('hidden');
-      window.scrollTo({ top: resultDiv.offsetTop, behavior: 'smooth' });
-    });
-  </script>
 </body>
 </html>
