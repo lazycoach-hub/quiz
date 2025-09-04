@@ -10,6 +10,7 @@
         .result { margin-top: 30px; }
         .bar { height: 30px; background: lightgray; margin: 10px 0; position: relative; border-radius: 5px; }
         .bar span { position: absolute; left: 10px; color: white; font-weight: bold; line-height: 30px; }
+        .optin-instruction { margin-top: 40px; font-weight: bold; font-size: 1.1em; }
     </style>
 </head>
 <body>
@@ -106,6 +107,16 @@
             const percent = Math.round((scores[style] / total) * 100);
             container.innerHTML += '<div class="bar" style="background: ' + getColor(style) + '; width:' + percent + '%;"><span>' + style + ' (' + percent + '%)</span></div>';
         }
+
+        // Instruction text above opt-in
+        container.innerHTML += '<div class="optin-instruction">Enter your details below to get the full breakdown and understand your results:</div>';
+
+        // Insert Kartra opt-in form
+        container.innerHTML += '<div class="kartra_optin_containerb53b3a3d6ab90ce0268229151c9bde11"></div>';
+        const script = document.createElement('script');
+        script.src = "https://app.kartra.com/optin/MO8F9KUv20lF";
+        document.body.appendChild(script);
+
         document.getElementById('quiz-container').innerHTML = '';
     }
 
