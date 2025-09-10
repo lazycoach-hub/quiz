@@ -1,459 +1,82 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>SAGA Character Sheet (Web – PDF‑style)</title>
-  <!-- Single‑file, no backend. Uses html2pdf via CDN for export. Designed to host on GitHub Pages & embed in Google Sites via <iframe>. -->
-  <style>
-    :root{
-      --ink:#111;
-      --muted:#6b7280; /* gray-500 */
-      --line:#cfd3da;  /* hairline */
-      --bg:#ffffff;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{margin:0;background:#efefef;color:var(--ink);font:14px/1.35 system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif}
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SAGA Character Sheet — Exact Overlay</title>
+<style>
+:root{--ink:#111;--muted:#6b7280}
+html,body{margin:0;background:#222;color:#111;font:14px/1.35 Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+.toolbar{display:flex;gap:8px;justify-content:center;align-items:center;padding:10px}
+.toolbar .btn{appearance:none;border:1.5px solid #111;background:#fff;color:#111;padding:8px 12px;border-radius:8px;font-weight:700;cursor:pointer}
+.stage{display:flex;justify-content:center;padding:10px 0 30px}
 
-    .wrap{max-width:1220px;margin:24px auto;padding:0 12px}
-    .toolbar{display:flex;gap:8px;justify-content:flex-end;margin-bottom:10px;flex-wrap:wrap}
-    .btn{appearance:none;border:1.5px solid var(--ink);background:#fff;color:var(--ink);padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:700}
-    .btn:active{transform:translateY(1px)}
 
-    /* ======= SHEET (A4 Landscape) ======= */
-    .sheet{width:297mm;min-height:210mm;max-width:100%;margin:0 auto;background:var(--bg);color:var(--ink);box-shadow:0 4px 30px rgba(0,0,0,.15);padding:10mm;position:relative}
-    .title{font-weight:900;letter-spacing:.14em;text-transform:uppercase;font-size:13px;margin:0 0 8px}
-    .section{border:1.5px solid var(--ink);border-radius:10px;padding:10px}
-    .label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+/* === SHEET BACKDROP (exact pixel size to match PNG) === */
+.sheet{position:relative;width:1186px;height:768px;background:url('saga_character_sheet.png') no-repeat 0 0/100% 100%;box-shadow:0 10px 35px rgba(0,0,0,.35);}
 
-    .grid{display:grid;gap:10px}
-    .cols-3{grid-template-columns:1.4fr 1fr 1.2fr} /* tuned to visually echo the PDF */
-    .cols-2{grid-template-columns:1fr 1fr}
 
-    input[type=text], input[type=number], textarea{width:100%;border:1.5px solid var(--ink);border-radius:8px;padding:6px 8px;background:#fff;color:var(--ink)}
-    textarea{min-height:70px;resize:vertical}
+/* === GENERIC FIELD STYLES === */
+.field{position:absolute}
+input[type=text], input[type=number], textarea{border:1.5px solid #333;border-radius:6px;padding:4px 6px;background:#fff;color:#111;font:14px/1.2 Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+input[type=number]{text-align:center}
+textarea{resize:none}
 
-    /* Portrait */
-    .portrait-box{border:1.5px dashed var(--ink);border-radius:12px;aspect-ratio:3/4;display:grid;place-items:center;overflow:hidden;background:#fafafa}
-    .portrait-box img{width:100%;height:100%;object-fit:cover}
-    .portrait-actions{display:flex;gap:8px;align-items:center;justify-content:space-between}
 
-    /* Pips for powers */
-    .pip-row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px}
-    .pip-row .name{font-weight:800;letter-spacing:.02em}
-    .pips{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
-    .pip{width:20px;height:20px;border:2px solid var(--ink);border-radius:50%;background:#fff;display:inline-grid;place-items:center;cursor:pointer}
-    .pip.filled{background:var(--ink)}
-    .pip[aria-pressed="true"]{background:var(--ink)}
+/* Pips */
+.pip-row{position:absolute;display:flex;gap:8px;align-items:center}
+.pip{width:18px;height:18px;border:2px solid #000;border-radius:50%;background:#fff;cursor:pointer;display:inline-block}
+.pip.filled{background:#000}
 
-    /* Trait line with tiny numeric boxes (as per PDF nuance) */
-    .trait-row{display:grid;grid-template-columns:1fr 52px;gap:8px;align-items:center}
-    .trait-row .trait-name{font-weight:800}
-    .trait-num{width:52px;text-align:center;font-weight:900;font-size:18px;padding:2px 6px;border-radius:8px}
 
-    /* Mastery tables – 10 circular ranks */
-    table.mastery{width:100%;border-collapse:collapse;border:1.5px solid var(--ink);border-radius:10px;overflow:hidden}
-    .mastery th,.mastery td{border-bottom:1px solid var(--line);padding:6px}
-    .mastery thead th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;background:#fafafa}
-    .mastery tbody tr:last-child td{border-bottom:none}
-    .mastery td.name{width:36%}
-    .rank-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:6px}
-    .rank{width:18px;height:18px;border:2px solid var(--ink);border-radius:50%;background:#fff;display:inline-grid;place-items:center;cursor:pointer;margin:auto}
-    .rank.selected{background:var(--ink)}
+/* Mastery row (10 pips with initials) */
+.mastery{position:absolute}
+.mastery .labels{position:absolute;display:flex;gap:14px;left:0;top:-16px;font-size:10px;color:#111}
+.mastery .dots{display:flex;gap:8px}
 
-    /* Items */
-    .items{display:grid;gap:6px}
-    .item-row{display:grid;grid-template-columns:1fr 120px;gap:8px}
 
-    /* Fate block (compact, like the PDF blocks) */
-    .fate{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-    .fate input[type=number]{text-align:center;font-weight:900;font-size:18px;border-radius:10px}
+/* Items grid */
+.item{position:absolute}
 
-    @media print{
-      body{background:#fff}
-      .wrap{max-width:none;margin:0}
-      .toolbar{display:none}
-      .sheet{box-shadow:none;margin:0;padding:8mm}
-      .btn{display:none}
-    }
-  </style>
+
+/* Edit/drag aid (toggleable) */
+.draggable{outline:1px dashed transparent}
+.drag-on .draggable{outline:1px dashed #06c}
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="toolbar">
-      <button class="btn" id="btnPDF">Save as PDF</button>
-      <button class="btn" id="btnReset">Blank Sheet</button>
-    </div>
+<div class="toolbar">
+<button class="btn" id="savePdf">Save as PDF</button>
+<button class="btn" id="blank">Blank Sheet</button>
+<button class="btn" id="toggleEdit" title="Hold Shift to drag when ON">Edit Mode</button>
+</div>
+<div class="stage">
+<div class="sheet" id="sheet"></div>
+</div>
 
-    <form id="sheetForm">
-      <div class="sheet" id="sheet">
 
-        <!-- === Top grid: Natural Powers | Fate | Identity/Portrait === -->
-        <div class="grid cols-3">
-          <!-- NATURAL POWERS -->
-          <section class="section" aria-labelledby="natTitle">
-            <h2 id="natTitle" class="title">Natural Powers</h2>
-            <div class="grid" style="gap:8px">
-              <div class="pip-row" data-pips="10" data-name="Might">
-                <div class="name">Might</div>
-                <div class="pips" role="group" aria-label="Might dots"></div>
-                <div></div>
-              </div>
-              <div class="pip-row" data-pips="10" data-name="Finesse">
-                <div class="name">Finesse</div>
-                <div class="pips" role="group" aria-label="Finesse dots"></div>
-                <div></div>
-              </div>
-              <div class="pip-row" data-pips="10" data-name="Smart">
-                <div class="name">Smart</div>
-                <div class="pips" role="group" aria-label="Smart dots"></div>
-                <div></div>
-              </div>
-              <div class="pip-row" data-pips="10" data-name="Sneak">
-                <div class="name">Sneak</div>
-                <div class="pips" role="group" aria-label="Sneak dots"></div>
-                <div></div>
-              </div>
-            </div>
-          </section>
+<!-- html2pdf for export -->
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<script>
+/**
+* Exact overlay engine
+* All positions are in pixels relative to sheet (1186x768)
+* You can tweak in Edit Mode (Shift+drag) and positions persist in localStorage.
+*/
+const SHEET_W=1186, SHEET_H=768;
+const sheet = document.getElementById('sheet');
 
-          <!-- FATE -->
-          <section class="section" aria-labelledby="fateTitle">
-            <h2 id="fateTitle" class="title">Fate</h2>
-            <div class="fate">
-              <div>
-                <div class="label">Life</div>
-                <input type="number" id="life" min="0" max="99" value="0"/>
-              </div>
-              <div>
-                <div class="label">Death</div>
-                <input type="number" id="death" min="0" max="99" value="0"/>
-              </div>
-              <div>
-                <div class="label">Destiny</div>
-                <input type="number" id="destiny" min="0" max="99" value="0"/>
-              </div>
-              <div>
-                <div class="label">Despair</div>
-                <input type="number" id="despair" min="0" max="99" value="0"/>
-              </div>
-            </div>
-          </section>
 
-          <!-- IDENTITY / PORTRAIT -->
-          <section class="section" aria-labelledby="idTitle">
-            <h2 id="idTitle" class="title">Identity</h2>
-            <div class="grid cols-2" style="align-items:end">
-              <div>
-                <div class="label">Character Name</div>
-                <input type="text" id="charName"/>
-              </div>
-              <div>
-                <div class="label">Type</div>
-                <input type="text" id="charType"/>
-              </div>
-            </div>
-            <div class="label" style="margin-top:8px">Character Portrait</div>
-            <div class="portrait-box" id="portraitBox" aria-label="Portrait preview">
-              <span style="color:var(--muted)">Upload portrait…</span>
-            </div>
-            <div class="portrait-actions" style="margin-top:8px">
-              <input type="file" id="portraitInput" accept="image/*"/>
-              <button type="button" class="btn" id="clearPortrait">Clear</button>
-            </div>
-          </section>
-        </div>
+// Utility builders
+function addText(id,x,y,w,h,placeholder=''){const el=document.createElement('input');el.type='text';el.id=id;el.className='field draggable';style(el,x,y,w,h);el.placeholder=placeholder;sheet.appendChild(el);return el}
+function addArea(id,x,y,w,h){const el=document.createElement('textarea');el.id=id;el.className='field draggable';style(el,x,y,w,h);sheet.appendChild(el);return el}
+function addNumber(id,x,y,w,h){const el=document.createElement('input');el.type='number';el.id=id;el.className='field draggable';style(el,x,y,w,h);sheet.appendChild(el);return el}
+function addPortraitBox(id,x,y,w,h){const el=document.createElement('div');el.id=id;el.className='field draggable';style(el,x,y,w,h);el.style.border='1px solid transparent';sheet.appendChild(el);return el}
+function addPips(id,x,y,count,spacing=22){const wrap=document.createElement('div');wrap.id=id;wrap.className='pip-row draggable';wrap.style.left=x+'px';wrap.style.top=y+'px';sheet.appendChild(wrap);for(let i=0;i<count;i++){const b=document.createElement('div');b.className='pip';b.dataset.index=i;wrap.appendChild(b)}wrap.addEventListener('click',e=>{const t=e.target;if(!t.classList.contains('pip'))return;const idx=parseInt(t.dataset.index,10);const v=parseInt(wrap.dataset.value||0,10);const next=(idx+1===v)?0:idx+1;wrap.dataset.value=next;updatePips(wrap)});updatePips(wrap);return wrap}
+function updatePips(wrap){const v=parseInt(wrap.dataset.value||0,10);[...wrap.children].forEach((p,i)=>p.classList.toggle('filled',i<v))}
+function addMastery(id,x,y){const mc=document.createElement('div');mc.id=id;mc.className='mastery draggable';mc.style.left=x+'px';mc.style.top=y+'px';const labels=document.createElement('div');labels.className='labels';const abbrev=['B','Pr','Sk','Ad','Ex','El','M','GM','SM','A'];abbrev.forEach(a=>{const s=document.createElement('span');s.textContent=a;labels.appendChild(s)});const dots=document.createElement('div');dots.className='dots';for(let i=0;i<10;i++){const d=document.createElement('div');d.className='pip';d.dataset.index=i;dots.appendChild(d)}mc.appendChild(labels);mc.appendChild(dots);dots.addEventListener('click',e=>{const t=e.target;if(!t.classList.contains('pip'))return;const idx=parseInt(t.dataset.index,10);const v=parseInt(mc.dataset.value||-1,10);mc.dataset.value=(v===idx)?-1:idx;updateMastery(mc)});updateMastery(mc);sheet.appendChild(mc);return mc}
+function updateMastery(mc){const sel=parseInt(mc.dataset.value||-1,10);const dots=mc.querySelectorAll('.pip');dots.forEach((d,i)=>d.classList.toggle('filled', sel>=0 && i<=sel))}
+function style(el,x,y,w,h){el.style.left=x+'px';el.style.top=y+'px';if(w)el.style.width=w+'px';if(h)el.style.height=h+'px'}
 
-        <!-- === Second row: Fantasy Powers | Traits | Allies/Affinity === -->
-        <div class="grid cols-3" style="margin-top:10px">
-          <!-- FANTASY POWERS -->
-          <section class="section" aria-labelledby="fanTitle">
-            <h2 id="fanTitle" class="title">Fantasy Powers</h2>
-            <div class="grid" style="gap:8px">
-              <div class="pip-row" data-pips="10" data-name="Faith">
-                <div class="name">Faith</div>
-                <div class="pips" role="group" aria-label="Faith dots"></div>
-                <div></div>
-              </div>
-              <div class="pip-row" data-pips="10" data-name="Magic">
-                <div class="name">Magic</div>
-                <div class="pips" role="group" aria-label="Magic dots"></div>
-                <div></div>
-              </div>
-              <div class="pip-row" data-pips="10" data-name="Mystic">
-                <div class="name">Mystic</div>
-                <div class="pips" role="group" aria-label="Mystic dots"></div>
-                <div></div>
-              </div>
-              <div class="pip-row" data-pips="10" data-name="Spirit">
-                <div class="name">Spirit</div>
-                <div class="pips" role="group" aria-label="Spirit dots"></div>
-                <div></div>
-              </div>
-            </div>
-          </section>
 
-          <!-- TRAITS (with tiny numeric boxes) -->
-          <section class="section" aria-labelledby="traitsTitle">
-            <h2 id="traitsTitle" class="title">Character Traits</h2>
-            <div class="grid" style="gap:8px">
-              <div class="trait-row"><div class="trait-name">Grit</div><input class="trait-num" type="number" id="tGrit" min="0" max="10" value="0"/></div>
-              <div class="trait-row"><div class="trait-name">Guts</div><input class="trait-num" type="number" id="tGuts" min="0" max="10" value="0"/></div>
-              <div class="trait-row"><div class="trait-name">Heart</div><input class="trait-num" type="number" id="tHeart" min="0" max="10" value="0"/></div>
-              <div class="trait-row"><div class="trait-name">Flair</div><input class="trait-num" type="number" id="tFlair" min="0" max="10" value="0"/></div>
-              <div class="trait-row"><div class="trait-name">Focus</div><input class="trait-num" type="number" id="tFocus" min="0" max="10" value="0"/></div>
-            </div>
-          </section>
-
-          <!-- AFFINITY / ALLIES (two stacked boxes to mirror the PDF) -->
-          <section class="section" aria-labelledby="affTitle">
-            <h2 id="affTitle" class="title">Affinity & Allies</h2>
-            <div>
-              <div class="label">Affinity</div>
-              <textarea id="affinity"></textarea>
-            </div>
-            <div style="margin-top:8px">
-              <div class="label">Allies</div>
-              <textarea id="allies"></textarea>
-            </div>
-          </section>
-        </div>
-
-        <!-- === Third row: Attack / Defend side-by-side (as power pips) === -->
-        <div class="grid cols-2" style="margin-top:10px">
-          <section class="section" aria-labelledby="atkTitle">
-            <h2 id="atkTitle" class="title">Attack</h2>
-            <div class="pip-row" data-pips="10" data-name="Attack">
-              <div class="name">Attack</div>
-              <div class="pips" role="group" aria-label="Attack dots"></div>
-              <div></div>
-            </div>
-          </section>
-          <section class="section" aria-labelledby="defTitle">
-            <h2 id="defTitle" class="title">Defend</h2>
-            <div class="pip-row" data-pips="10" data-name="Defend">
-              <div class="name">Defend</div>
-              <div class="pips" role="group" aria-label="Defend dots"></div>
-              <div></div>
-            </div>
-          </section>
-        </div>
-
-        <!-- === Fourth row: Mastery tables === -->
-        <div class="grid cols-2" style="margin-top:10px">
-          <section class="section" aria-labelledby="wmTitle">
-            <h2 id="wmTitle" class="title">Weapon Mastery</h2>
-            <table class="mastery" id="weaponsTbl">
-              <thead>
-                <tr>
-                  <th class="name">Weapon</th>
-                  <th colspan="10">B · Pr · Sk · Ad · Ex · El · M · GM · SM · A</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-            <div style="margin-top:6px"><button type="button" class="btn" data-add-weapon>Add weapon</button></div>
-          </section>
-
-          <section class="section" aria-labelledby="amTitle">
-            <h2 id="amTitle" class="title">Armor / Protection</h2>
-            <table class="mastery" id="armorTbl">
-              <thead>
-                <tr>
-                  <th class="name">Armor</th>
-                  <th colspan="10">B · Pr · Sk · Ad · Ex · El · M · GM · SM · A</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-            <div style="margin-top:6px"><button type="button" class="btn" data-add-armor>Add armor</button></div>
-          </section>
-        </div>
-
-        <!-- === Fifth row: Items === -->
-        <div class="grid cols-2" style="margin-top:10px">
-          <section class="section" aria-labelledby="nmTitle">
-            <h2 id="nmTitle" class="title">Non‑Magic Items</h2>
-            <div class="items" id="nmItems"></div>
-            <div style="margin-top:6px"><button type="button" class="btn" id="addNM">Add item</button></div>
-          </section>
-          <section class="section" aria-labelledby="mTitle">
-            <h2 id="mTitle" class="title">Magic Items</h2>
-            <div class="items" id="mItems"></div>
-            <div style="margin-top:6px"><button type="button" class="btn" id="addM">Add magic item</button></div>
-          </section>
-        </div>
-
-      </div>
-    </form>
-  </div>
-
-  <!-- html2pdf CDN (no backend needed) -->
-  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
-  <script>
-  (function(){
-    const form = document.getElementById('sheetForm');
-
-    // ------- PIP ROWS (white circles after powers) -------
-    const pipRows = Array.from(document.querySelectorAll('.pip-row'));
-    pipRows.forEach(row=>{
-      const count = parseInt(row.dataset.pips||'10',10);
-      const name  = row.dataset.name||'Stat';
-      const pipsEl = row.querySelector('.pips');
-      row.dataset.value = '0';
-      for(let i=0;i<count;i++){
-        const b = document.createElement('button');
-        b.type='button';
-        b.className='pip';
-        b.setAttribute('aria-label', name+' pip '+(i+1));
-        b.dataset.index = String(i);
-        pipsEl.appendChild(b);
-      }
-      pipsEl.addEventListener('click', e=>{
-        const t = e.target;
-        if(!(t instanceof Element)) return;
-        if(!t.classList.contains('pip')) return;
-        const idx = parseInt(t.dataset.index,10);
-        const current = parseInt(row.dataset.value||'0',10);
-        const next = (idx+1===current) ? 0 : (idx+1); // click same value to clear
-        row.dataset.value = String(next);
-        updateRow(row);
-      });
-      // keyboard support
-      pipsEl.addEventListener('keydown', e=>{
-        const current = parseInt(row.dataset.value||'0',10);
-        if(e.key==='ArrowRight' || e.key==='+'){ row.dataset.value = String(Math.min(current+1, count)); updateRow(row); e.preventDefault(); }
-        if(e.key==='ArrowLeft'  || e.key==='-'){ row.dataset.value = String(Math.max(current-1, 0));   updateRow(row); e.preventDefault(); }
-      });
-      updateRow(row);
-    });
-
-    function updateRow(row){
-      const value = parseInt(row.dataset.value||'0',10);
-      row.querySelectorAll('.pip').forEach((pip,i)=>{
-        pip.classList.toggle('filled', i<value);
-        pip.setAttribute('aria-pressed', i<value ? 'true' : 'false');
-      });
-    }
-
-    // ------- PORTRAIT -------
-    const portraitInput = document.getElementById('portraitInput');
-    const portraitBox   = document.getElementById('portraitBox');
-    document.getElementById('clearPortrait').addEventListener('click',()=>{
-      portraitInput.value='';
-      portraitBox.innerHTML = '<span style="color:#6b7280">Upload portrait…</span>';
-    });
-    portraitInput.addEventListener('change',()=>{
-      const f = portraitInput.files && portraitInput.files[0];
-      if(!f) return;
-      const reader = new FileReader();
-      reader.onload = ()=>{
-        const img = new Image();
-        img.onload = ()=>{ portraitBox.innerHTML=''; portraitBox.appendChild(img); };
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(f);
-    });
-
-    // ------- WEAPON / ARMOR MASTERY -------
-    const RANKS = ['B','Pr','Sk','Ad','Ex','El','M','GM','SM','A'];
-    function buildMasteryRow(tableId, placeholder){
-      const tbody = document.querySelector(tableId+' tbody');
-      const tr = document.createElement('tr');
-      const tdName = document.createElement('td');
-      tdName.className='name';
-      const input = document.createElement('input');
-      input.type='text';
-      input.placeholder=placeholder;
-      tdName.appendChild(input);
-      const tdRanks = document.createElement('td');
-      tdRanks.colSpan=10;
-      const grid = document.createElement('div');
-      grid.className='rank-grid';
-      RANKS.forEach((rk, i)=>{
-        const dot = document.createElement('button');
-        dot.type='button';
-        dot.className='rank';
-        dot.title=rk;
-        dot.dataset.index=String(i);
-        grid.appendChild(dot);
-      });
-      grid.addEventListener('click', e=>{
-        const t = e.target;
-        if(!(t instanceof Element)) return;
-        if(!t.classList.contains('rank')) return;
-        const idx = parseInt(t.dataset.index,10);
-        const selected = tr.dataset.selected? parseInt(tr.dataset.selected,10): -1;
-        tr.dataset.selected = (selected===idx) ? String(-1) : String(idx);
-        updateMasteryRow(tr);
-      });
-      tdRanks.appendChild(grid);
-      tr.appendChild(tdName); tr.appendChild(tdRanks);
-      tbody.appendChild(tr);
-      updateMasteryRow(tr);
-    }
-    function updateMasteryRow(tr){
-      const sel = tr.dataset.selected? parseInt(tr.dataset.selected,10): -1;
-      const dots = tr.querySelectorAll('.rank');
-      dots.forEach((d,i)=> d.classList.toggle('selected', i<=sel && sel>=0));
-    }
-    ['#weaponsTbl','#armorTbl'].forEach((tbl, i)=>{
-      buildMasteryRow(tbl, i===0? 'Weapon name…' : 'Armor / protection…');
-      buildMasteryRow(tbl, i===0? 'Weapon name…' : 'Armor / protection…');
-      buildMasteryRow(tbl, i===0? 'Weapon name…' : 'Armor / protection…');
-    });
-    document.querySelector('[data-add-weapon]').addEventListener('click',()=>buildMasteryRow('#weaponsTbl','Weapon name…'));
-    document.querySelector('[data-add-armor]').addEventListener('click',()=>buildMasteryRow('#armorTbl','Armor / protection…'));
-
-    // ------- ITEMS -------
-    function addNM(){
-      const wrap = document.getElementById('nmItems');
-      const row = document.createElement('div');
-      row.className='item-row';
-      row.innerHTML = '<input type="text" placeholder="Item description…"><div></div>';
-      wrap.appendChild(row);
-    }
-    function addM(){
-      const wrap = document.getElementById('mItems');
-      const row = document.createElement('div');
-      row.className='item-row';
-      row.innerHTML = '<input type="text" placeholder="Magic item…"><input type="number" placeholder="Enchant Lv" min="0" max="10">';
-      wrap.appendChild(row);
-    }
-    document.getElementById('addNM').addEventListener('click', addNM);
-    document.getElementById('addM').addEventListener('click', addM);
-    addNM(); addNM(); addM();
-
-    // ------- PDF Export -------
-    document.getElementById('btnPDF').addEventListener('click', ()=>{
-      const name = (document.getElementById('charName').value||'saga-character').replace(/[^a-z0-9\-_]+/gi,'_');
-      const opt = {
-        margin:       [5,5,5,5],
-        filename:     name + '.pdf',
-        image:        { type: 'jpeg', quality: 0.95 },
-        html2canvas:  { scale: 2, useCORS: true },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
-      };
-      html2pdf().set(opt).from(document.getElementById('sheet')).save();
-    });
-
-    // ------- Reset / Blank -------
-    document.getElementById('btnReset').addEventListener('click', ()=>{
-      form.reset();
-      // clear pips
-      document.querySelectorAll('.pip-row').forEach(r=>{ r.dataset.value='0'; (function(row){ row.querySelectorAll('.pip').forEach(p=>p.classList.remove('filled')); })(r); });
-      // clear mastery rows selections
-      document.querySelectorAll('tr').forEach(tr=>{ if(tr.closest('.mastery')){ tr.dataset.selected='-1'; updateMasteryRow(tr); } });
-      // clear portrait
-      document.getElementById('clearPortrait').click();
-      // clear dynamic items
-      document.getElementById('nmItems').innerHTML='';
-      document.getElementById('mItems').innerHTML='';
-      addNM(); addNM(); addM();
-      window.scrollTo({top:0,behavior:'smooth'});
-    });
-  })();
-  </script>
-</body>
-</html>
+// === LAYOUT MAP (initial coordinates approximated to provided PNG).
