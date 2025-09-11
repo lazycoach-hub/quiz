@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>SAGA Character Sheet — Exact Overlay (inline PNG)</title>
+  <title>SAGA Character Sheet — Exact Overlay (with Calibration)</title>
   <style>
-    :root{--ink:#111;--muted:#6b7280}
+    :root{--ink:#111;--muted:#6b7280;--pip:18px;--pip-b:2px}
     html,body{margin:0;background:#222;color:#111;font:14px/1.35 Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-    .toolbar{display:flex;gap:8px;justify-content:center;align-items:center;padding:10px}
+    .toolbar{display:flex;gap:8px;justify-content:center;align-items:center;padding:10px;flex-wrap:wrap}
     .toolbar .btn{appearance:none;border:1.5px solid #111;background:#fff;color:#111;padding:8px 12px;border-radius:8px;font-weight:700;cursor:pointer}
     .stage{display:flex;justify-content:center;padding:10px 0 30px}
 
@@ -21,7 +21,7 @@
     textarea{resize:none}
 
     .pip-row{position:absolute;display:flex;gap:8px;align-items:center;z-index:1}
-    .pip{width:18px;height:18px;border:2px solid #000;border-radius:50%;background:#fff;cursor:pointer;display:inline-block}
+    .pip{width:var(--pip);height:var(--pip);border:var(--pip-b) solid #000;border-radius:50%;background:#fff;cursor:pointer;display:inline-block}
     .pip.filled{background:#000}
 
     .mastery{position:absolute;z-index:1}
@@ -32,6 +32,13 @@
     .drag-on .draggable{outline:1px dashed #06c}
 
     .tiny{font-size:12px;color:#eee;margin-left:6px}
+
+    /* Calibration panel */
+    .cal{position:fixed;left:12px;top:12px;background:#fff;border:1px solid #111;border-radius:10px;padding:10px;display:none;z-index:9999}
+    .cal h3{margin:0 0 6px 0;font-size:13px}
+    .cal .row{display:grid;grid-template-columns:90px 1fr 50px;gap:6px;align-items:center;margin:6px 0}
+    .cal .row input[type=range]{width:220px}
+    .cal .row input[type=number]{width:60px}
   </style>
 </head>
 <body>
@@ -39,11 +46,24 @@
     <button class="btn" id="savePdf">Save as PDF</button>
     <button class="btn" id="blank">Blank Sheet</button>
     <button class="btn" id="toggleEdit" title="Hold Shift to drag when ON">Edit Mode</button>
-    <span class="tiny">Sheet is locked to 1186×768 px to match the background exactly.</span>
+    <button class="btn" id="toggleCal">Calibrate</button>
+    <span class="tiny">Sheet is locked to 1186×768 px to match the background exactly. Use <b>Calibrate</b> to align everything at once.</span>
   </div>
+
+  <!-- Calibration controls -->
+  <div class="cal" id="cal">
+    <h3>Calibration</h3>
+    <div class="row"><label>Offset X</label><input type="range" id="oxR" min="-200" max="200" step="1"><input type="number" id="oxN" step="1"></div>
+    <div class="row"><label>Offset Y</label><input type="range" id="oyR" min="-200" max="200" step="1"><input type="number" id="oyN" step="1"></div>
+    <div class="row"><label>Scale X</label><input type="range" id="sxR" min="0.80" max="1.20" step="0.002"><input type="number" id="sxN" step="0.001"></div>
+    <div class="row"><label>Scale Y</label><input type="range" id="syR" min="0.80" max="1.20" step="0.002"><input type="number" id="syN" step="0.001"></div>
+    <div class="row"><label>Pip size</label><input type="range" id="psR" min="12" max="28" step="1"><input type="number" id="psN" step="1"></div>
+    <div class="row"><label>Border</label><input type="range" id="pbR" min="1" max="4" step="0.5"><input type="number" id="pbN" step="0.5"></div>
+    <div class="row" style="grid-template-columns:1fr 1fr"><button id="calReset">Reset</button><button id="calClose">Close</button></div>
+  </div>
+
   <div class="stage">
     <div class="sheet" id="sheet">
-      <!-- Inline background so GitHub Pages/Google Sites can’t miss it -->
       <img id="bg" class="bg" alt="SAGA sheet background" src="saga_character_sheet.png"/>
       <div id="bgError" style="position:absolute;inset:0;display:none;place-items:center;z-index:2;color:#fff;background:rgba(185,28,28,.85);font-weight:800">
         Background image not found. Put <code>saga_character_sheet.png</code> next to this HTML, or use <code>?bg=YourFile.png</code>
@@ -53,27 +73,47 @@
 
   <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
   <script>
-  const SHEET_W=1186, SHEET_H=768;
-  // Allow bg to be overridden via ?bg=filename.png and show error if missing
-  (function(){
-    const params=new URLSearchParams(location.search);
-    const bg=document.getElementById('bg');
-    const err=document.getElementById('bgError');
-    const src=params.get('bg')||bg.getAttribute('src');
-    bg.src=src;
-    bg.addEventListener('error',()=>{if(err) err.style.display='grid'});
-  })(); const sheet=document.getElementById('sheet');
-  function style(el,x,y,w,h){el.style.left=x+'px';el.style.top=y+'px';if(w!=null)el.style.width=w+'px';if(h!=null)el.style.height=h+'px'}
-  function addText(id,x,y,w,h){const el=document.createElement('input');el.type='text';el.id=id;el.className='field draggable';style(el,x,y,w,h);sheet.appendChild(el);return el}
-  function addArea(id,x,y,w,h){const el=document.createElement('textarea');el.id=id;el.className='field draggable';style(el,x,y,w,h);sheet.appendChild(el);return el}
-  function addNumber(id,x,y,w,h){const el=document.createElement('input');el.type='number';el.id=id;el.className='field draggable';style(el,x,y,w,h);sheet.appendChild(el);return el}
-  function addBox(id,x,y,w,h){const el=document.createElement('div');el.id=id;el.className='field draggable';style(el,x,y,w,h);el.style.border='1px solid transparent';sheet.appendChild(el);return el}
-  function addPips(id,x,y,count,spacing=22){const wrap=document.createElement('div');wrap.id=id;wrap.className='pip-row draggable';style(wrap,x,y);for(let i=0;i<count;i++){const b=document.createElement('div');b.className='pip';b.dataset.index=i;wrap.appendChild(b)}wrap.addEventListener('click',e=>{const t=e.target;if(!t.classList.contains('pip'))return;const idx=+t.dataset.index;const v=+(wrap.dataset.value||0);wrap.dataset.value=(idx+1===v)?0:(idx+1);updatePips(wrap)});sheet.appendChild(wrap);updatePips(wrap);return wrap}
+  const SHEET_W=1186, SHEET_H=768; const sheet=document.getElementById('sheet');
+  // Allow bg override and show error if missing
+  (function(){const p=new URLSearchParams(location.search);const bg=document.getElementById('bg');const err=document.getElementById('bgError');const src=p.get('bg')||bg.getAttribute('src');bg.src=src;bg.addEventListener('error',()=>{if(err) err.style.display='grid'});})();
+
+  // === Calibration state ===
+  const CAL = (function(){try{return JSON.parse(localStorage.getItem('saga_cal')||'{}')}catch{return{}}})();
+  if(CAL.ox==null){CAL.ox=0} if(CAL.oy==null){CAL.oy=0} if(CAL.sx==null){CAL.sx=1} if(CAL.sy==null){CAL.sy=1} if(CAL.ps==null){CAL.ps=18} if(CAL.pb==null){CAL.pb=2}
+
+  // Wire calibration UI
+  const calEl=document.getElementById('cal');
+  const bind=(rid,nid,key)=>{const r=document.getElementById(rid), n=document.getElementById(nid);const set=v=>{CAL[key]=+v;r.value=v;n.value=v;reflow();saveCal()};r.oninput=e=>set(e.target.value);n.oninput=e=>set(e.target.value);set(CAL[key])};
+  document.getElementById('toggleCal').onclick=()=>{calEl.style.display=calEl.style.display==='none'||!calEl.style.display?'block':'none'};
+  document.getElementById('calClose').onclick=()=>calEl.style.display='none';
+  document.getElementById('calReset').onclick=()=>{CAL.ox=0;CAL.oy=0;CAL.sx=1;CAL.sy=1;CAL.ps=18;CAL.pb=2;bind('oxR','oxN','ox');bind('oyR','oyN','oy');bind('sxR','sxN','sx');bind('syR','syN','sy');bind('psR','psN','ps');bind('pbR','pbN','pb');};
+  bind('oxR','oxN','ox'); bind('oyR','oyN','oy'); bind('sxR','sxN','sx'); bind('syR','syN','sy'); bind('psR','psN','ps'); bind('pbR','pbN','pb');
+  function saveCal(){localStorage.setItem('saga_cal', JSON.stringify(CAL))}
+
+  // Builders (store base coords; compute with calibration on reflow)
+  function styleBase(el,x,y,w,h){el.dataset.x=x;el.dataset.y=y;if(w!=null) el.dataset.w=w; if(h!=null) el.dataset.h=h;}
+  function apply(el){const x=+el.dataset.x, y=+el.dataset.y; const w=+el.dataset.w, h=+el.dataset.h; el.style.left=(CAL.ox + x*CAL.sx)+'px'; el.style.top=(CAL.oy + y*CAL.sy)+'px'; if(!isNaN(w)) el.style.width=(w*CAL.sx)+'px'; if(!isNaN(h)) el.style.height=(h*CAL.sy)+'px';}
+  function addText(id,x,y,w,h){const el=document.createElement('input');el.type='text';el.id=id;el.className='field draggable';styleBase(el,x,y,w,h);sheet.appendChild(el);apply(el);return el}
+  function addArea(id,x,y,w,h){const el=document.createElement('textarea');el.id=id;el.className='field draggable';styleBase(el,x,y,w,h);sheet.appendChild(el);apply(el);return el}
+  function addNumber(id,x,y,w,h){const el=document.createElement('input');el.type='number';el.id=id;el.className='field draggable';styleBase(el,x,y,w,h);sheet.appendChild(el);apply(el);return el}
+  function addBox(id,x,y,w,h){const el=document.createElement('div');el.id=id;el.className='field draggable';styleBase(el,x,y,w,h);el.style.border='1px solid transparent';sheet.appendChild(el);apply(el);return el}
+  function addPips(id,x,y,count){const wrap=document.createElement('div');wrap.id=id;wrap.className='pip-row draggable';styleBase(wrap,x,y);sheet.appendChild(wrap);for(let i=0;i<count;i++){const b=document.createElement('div');b.className='pip';b.dataset.index=i;wrap.appendChild(b)}wrap.addEventListener('click',e=>{const t=e.target;if(!t.classList.contains('pip'))return;const idx=+t.dataset.index;const v=+(wrap.dataset.value||0);wrap.dataset.value=(idx+1===v)?0:(idx+1);updatePips(wrap)});updatePips(wrap);apply(wrap);return wrap}
   function updatePips(wrap){const v=+(wrap.dataset.value||0);[...wrap.children].forEach((p,i)=>p.classList.toggle('filled',i<v))}
-  function addMastery(id,x,y){const mc=document.createElement('div');mc.id=id;mc.className='mastery draggable';style(mc,x,y);const labels=document.createElement('div');labels.className='labels';['B','Pr','Sk','Ad','Ex','El','M','GM','SM','A'].forEach(a=>{const s=document.createElement('span');s.textContent=a;labels.appendChild(s)});const dots=document.createElement('div');dots.className='dots';for(let i=0;i<10;i++){const d=document.createElement('div');d.className='pip';d.dataset.index=i;dots.appendChild(d)}mc.appendChild(labels);mc.appendChild(dots);dots.addEventListener('click',e=>{const t=e.target;if(!t.classList.contains('pip'))return;const idx=+t.dataset.index;const v=+(mc.dataset.value||-1);mc.dataset.value=(v===idx)?-1:idx;updateMastery(mc)});sheet.appendChild(mc);updateMastery(mc);return mc}
+  function addMastery(id,x,y){const mc=document.createElement('div');mc.id=id;mc.className='mastery draggable';styleBase(mc,x,y);const labels=document.createElement('div');labels.className='labels';['B','Pr','Sk','Ad','Ex','El','M','GM','SM','A'].forEach(a=>{const s=document.createElement('span');s.textContent=a;labels.appendChild(s)});const dots=document.createElement('div');dots.className='dots';for(let i=0;i<10;i++){const d=document.createElement('div');d.className='pip';d.dataset.index=i;dots.appendChild(d)}mc.appendChild(labels);mc.appendChild(dots);dots.addEventListener('click',e=>{const t=e.target;if(!t.classList.contains('pip'))return;const idx=+t.dataset.index;const v=+(mc.dataset.value||-1);mc.dataset.value=(v===idx)?-1:idx;updateMastery(mc)});sheet.appendChild(mc);updateMastery(mc);apply(mc);return mc}
   function updateMastery(mc){const sel=+(mc.dataset.value||-1);mc.querySelectorAll('.pip').forEach((d,i)=>d.classList.toggle('filled', sel>=0 && i<=sel))}
 
-  // === Coordinates (tightened to the provided PNG) ===
+  function reflow(){
+    // update element positions
+    sheet.querySelectorAll('.draggable').forEach(apply);
+    // scale pip sizes with calibration
+    document.documentElement.style.setProperty('--pip', CAL.ps+'px');
+    document.documentElement.style.setProperty('--pip-b', CAL.pb+'px');
+    // adjust mastery label spacing slightly with scale
+    sheet.querySelectorAll('.mastery .labels').forEach(l=>{l.style.gap=(14*CAL.sx)+'px'; l.style.top=(-16*CAL.sy)+'px'; l.style.left=(2*CAL.sx)+'px'});
+    sheet.querySelectorAll('.mastery .dots').forEach(d=>{d.style.gap=(8*CAL.sx)+'px'});
+  }
+
+  // === Coordinates (base, uncalibrated) ===
   const L={
     // top row
     type:[170,20,240,24], name:[466,20,260,24], title:[805,20,210,24],
@@ -156,12 +196,15 @@
 
   for(let i=1;i<=5;i++){addText('m'+i,...L['m'+i]); const en=L['en'+i]; addPips('en'+i,en[0],en[1],5)}
 
-  // Edit mode
+  // Edit mode (fine-grained dragging of individual elements)
   let edit=false, dragTarget=null, ox=0, oy=0, sx=0, sy=0;
   document.getElementById('toggleEdit').addEventListener('click',()=>{edit=!edit;document.body.classList.toggle('drag-on',edit)});
   sheet.addEventListener('pointerdown',e=>{if(!edit||!e.shiftKey)return;const t=e.target.closest('.draggable');if(!t)return;dragTarget=t;sx=e.clientX;sy=e.clientY;const r=t.getBoundingClientRect();const rs=sheet.getBoundingClientRect();ox=r.left-rs.left;oy=r.top-rs.top;t.setPointerCapture(e.pointerId)});
   sheet.addEventListener('pointermove',e=>{if(!dragTarget)return;const nx=Math.min(SHEET_W-10,Math.max(0,ox+(e.clientX-sx)));const ny=Math.min(SHEET_H-10,Math.max(0,oy+(e.clientY-sy)));dragTarget.style.left=nx+'px';dragTarget.style.top=ny+'px'});
   sheet.addEventListener('pointerup',()=>{if(!dragTarget)return;dragTarget=null});
+
+  // Initial reflow to apply calibration
+  reflow();
 
   // Export
   document.getElementById('savePdf').addEventListener('click',()=>{const opt={filename:(document.getElementById('name')?.value||'saga-character')+'.pdf',html2canvas:{scale:2,useCORS:true},jsPDF:{unit:'px',format:[SHEET_W,SHEET_H],orientation:'landscape'}};html2pdf().set(opt).from(sheet).save()});
