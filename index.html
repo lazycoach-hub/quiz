@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>SAGA Character Sheet — Exact Overlay</title>
+  <title>SAGA Character Sheet — Exact Overlay (GitHub Pages friendly)</title>
   <style>
     :root{--ink:#111;--muted:#6b7280}
     html,body{margin:0;background:#222;color:#111;font:14px/1.35 Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
@@ -12,21 +12,22 @@
     .stage{display:flex;justify-content:center;padding:10px 0 30px}
 
     /* === SHEET BACKDROP (exact pixel size to match PNG) === */
-    .sheet{position:relative;width:1186px;height:768px;background:url('saga_character_sheet.png') no-repeat 0 0/100% 100%;box-shadow:0 10px 35px rgba(0,0,0,.35);}
+    .sheet{position:relative;width:1186px;height:768px;background:#fff; /* fallback to white so it's never empty */ box-shadow:0 10px 35px rgba(0,0,0,.35)}
+    .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;z-index:0}
 
-    /* === GENERIC FIELD STYLES === */
-    .field{position:absolute}
+    /* === GENERIC FIELD STYLES (overlay above bg) === */
+    .field{position:absolute;z-index:1}
     input[type=text], input[type=number], textarea{border:1.5px solid #333;border-radius:6px;padding:4px 6px;background:#fff;color:#111;font:14px/1.2 Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
     input[type=number]{text-align:center}
     textarea{resize:none}
 
     /* Pips */
-    .pip-row{position:absolute;display:flex;gap:8px;align-items:center}
+    .pip-row{position:absolute;display:flex;gap:8px;align-items:center;z-index:1}
     .pip{width:18px;height:18px;border:2px solid #000;border-radius:50%;background:#fff;cursor:pointer;display:inline-block}
     .pip.filled{background:#000}
 
     /* Mastery row (10 pips with initials) */
-    .mastery{position:absolute}
+    .mastery{position:absolute;z-index:1}
     .mastery .labels{position:absolute;display:flex;gap:14px;left:0;top:-16px;font-size:10px;color:#111}
     .mastery .dots{display:flex;gap:8px}
 
@@ -36,6 +37,8 @@
     /* Edit/drag aid (toggleable) */
     .draggable{outline:1px dashed transparent}
     .drag-on .draggable{outline:1px dashed #06c}
+
+    .error{position:absolute;inset:0;display:grid;place-items:center;color:#b91c1c;font-weight:800;z-index:2;pointer-events:none}
   </style>
 </head>
 <body>
@@ -45,209 +48,122 @@
     <button class="btn" id="toggleEdit" title="Hold Shift to drag when ON">Edit Mode</button>
   </div>
   <div class="stage">
-    <div class="sheet" id="sheet"></div>
+    <div class="sheet" id="sheet">
+      <img id="bg" class="bg" alt="SAGA sheet background"/>
+      <div id="bgError" class="error" style="display:none">Background image not found. Ensure <code>saga_character_sheet.png</code> is in the same folder (or use <code>?bg=filename.png</code>).</div>
+    </div>
   </div>
 
   <!-- html2pdf for export -->
   <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
   <script>
-  /**
-   * Exact overlay engine
-   * All positions are in pixels relative to sheet (1186x768)
-   * You can tweak in Edit Mode (Shift+drag) and positions persist in localStorage.
-   */
+  /** Exact overlay engine */
   const SHEET_W=1186, SHEET_H=768;
   const sheet = document.getElementById('sheet');
+  const bg = document.getElementById('bg');
+  const params = new URLSearchParams(location.search);
+  const bgSrc = params.get('bg') || 'saga_character_sheet.png';
+  bg.src = bgSrc;
+  bg.addEventListener('error',()=>{document.getElementById('bgError').style.display='grid'});
 
-  // Utility builders
-  function addText(id,x,y,w,h,placeholder=''){const el=document.createElement('input');el.type='text';el.id=id;el.className='field draggable';style(el,x,y,w,h);el.placeholder=placeholder;sheet.appendChild(el);return el}
+  // Builders
+  function style(el,x,y,w,h){el.style.left=x+'px';el.style.top=y+'px';if(w!=null)el.style.width=w+'px';if(h!=null)el.style.height=h+'px'}
+  function addText(id,x,y,w,h){const el=document.createElement('input');el.type='text';el.id=id;el.className='field draggable';style(el,x,y,w,h);sheet.appendChild(el);return el}
   function addArea(id,x,y,w,h){const el=document.createElement('textarea');el.id=id;el.className='field draggable';style(el,x,y,w,h);sheet.appendChild(el);return el}
   function addNumber(id,x,y,w,h){const el=document.createElement('input');el.type='number';el.id=id;el.className='field draggable';style(el,x,y,w,h);sheet.appendChild(el);return el}
-  function addPortraitBox(id,x,y,w,h){const el=document.createElement('div');el.id=id;el.className='field draggable';style(el,x,y,w,h);el.style.border='1px solid transparent';sheet.appendChild(el);return el}
-  function addPips(id,x,y,count,spacing=22){const wrap=document.createElement('div');wrap.id=id;wrap.className='pip-row draggable';wrap.style.left=x+'px';wrap.style.top=y+'px';sheet.appendChild(wrap);for(let i=0;i<count;i++){const b=document.createElement('div');b.className='pip';b.dataset.index=i;wrap.appendChild(b)}wrap.addEventListener('click',e=>{const t=e.target;if(!t.classList.contains('pip'))return;const idx=parseInt(t.dataset.index,10);const v=parseInt(wrap.dataset.value||0,10);const next=(idx+1===v)?0:idx+1;wrap.dataset.value=next;updatePips(wrap)});updatePips(wrap);return wrap}
-  function updatePips(wrap){const v=parseInt(wrap.dataset.value||0,10);[...wrap.children].forEach((p,i)=>p.classList.toggle('filled',i<v))}
-  function addMastery(id,x,y){const mc=document.createElement('div');mc.id=id;mc.className='mastery draggable';mc.style.left=x+'px';mc.style.top=y+'px';const labels=document.createElement('div');labels.className='labels';const abbrev=['B','Pr','Sk','Ad','Ex','El','M','GM','SM','A'];abbrev.forEach(a=>{const s=document.createElement('span');s.textContent=a;labels.appendChild(s)});const dots=document.createElement('div');dots.className='dots';for(let i=0;i<10;i++){const d=document.createElement('div');d.className='pip';d.dataset.index=i;dots.appendChild(d)}mc.appendChild(labels);mc.appendChild(dots);dots.addEventListener('click',e=>{const t=e.target;if(!t.classList.contains('pip'))return;const idx=parseInt(t.dataset.index,10);const v=parseInt(mc.dataset.value||-1,10);mc.dataset.value=(v===idx)?-1:idx;updateMastery(mc)});updateMastery(mc);sheet.appendChild(mc);return mc}
-  function updateMastery(mc){const sel=parseInt(mc.dataset.value||-1,10);const dots=mc.querySelectorAll('.pip');dots.forEach((d,i)=>d.classList.toggle('filled', sel>=0 && i<=sel))}
-  function style(el,x,y,w,h){el.style.left=x+'px';el.style.top=y+'px';if(w)el.style.width=w+'px';if(h)el.style.height=h+'px'}
+  function addBox(id,x,y,w,h){const el=document.createElement('div');el.id=id;el.className='field draggable';style(el,x,y,w,h);el.style.border='1px solid transparent';sheet.appendChild(el);return el}
+  function addPips(id,x,y,count){const wrap=document.createElement('div');wrap.id=id;wrap.className='pip-row draggable';wrap.style.left=x+'px';wrap.style.top=y+'px';sheet.appendChild(wrap);for(let i=0;i<count;i++){const b=document.createElement('div');b.className='pip';b.dataset.index=i;wrap.appendChild(b)}wrap.addEventListener('click',e=>{const t=e.target;if(!t.classList.contains('pip'))return;const idx=+t.dataset.index;const v=+(wrap.dataset.value||0);wrap.dataset.value=(idx+1===v)?0:(idx+1);updatePips(wrap)});updatePips(wrap);return wrap}
+  function updatePips(wrap){const v=+(wrap.dataset.value||0);[...wrap.children].forEach((p,i)=>p.classList.toggle('filled',i<v))}
+  function addMastery(id,x,y){const mc=document.createElement('div');mc.id=id;mc.className='mastery draggable';style(mc,x,y);const labels=document.createElement('div');labels.className='labels';['B','Pr','Sk','Ad','Ex','El','M','GM','SM','A'].forEach(a=>{const s=document.createElement('span');s.textContent=a;labels.appendChild(s)});const dots=document.createElement('div');dots.className='dots';for(let i=0;i<10;i++){const d=document.createElement('div');d.className='pip';d.dataset.index=i;dots.appendChild(d)};mc.appendChild(labels);mc.appendChild(dots);dots.addEventListener('click',e=>{const t=e.target;if(!t.classList.contains('pip'))return;const idx=+t.dataset.index;const v=+(mc.dataset.value||-1);mc.dataset.value=(v===idx)?-1:idx;updateMastery(mc)});updateMastery(mc);sheet.appendChild(mc);return mc}
+  function updateMastery(mc){const sel=+(mc.dataset.value||-1);mc.querySelectorAll('.pip').forEach((d,i)=>d.classList.toggle('filled', sel>=0 && i<=sel))}
 
-  // === LAYOUT MAP (initial coordinates approximated to provided PNG).
-  // You can nudge in Edit Mode if anything is 1–2px off on GitHub Pages.
-  const L = {
-    // Top row text fields
-    type:   {x:170,y:20,w:240,h:24},
-    name:   {x:466,y:20,w:260,h:24},
-    title:  {x:805,y:20,w:210,h:24},
-    affinity:{x:40,y:72,w:353,h:34},
-    allies: {x:794,y:72,w:353,h:34},
-
-    // Portrait box (empty, non-interactive)
+  // Layout map (same as before)
+  const L={
+    type:{x:170,y:20,w:240,h:24}, name:{x:466,y:20,w:260,h:24}, title:{x:805,y:20,w:210,h:24},
+    affinity:{x:40,y:72,w:353,h:34}, allies:{x:794,y:72,w:353,h:34},
     portrait:{x:466,y:74,w:256,h:320},
-
-    // Natural powers block (left)
-    n_mightNum:{x:132,y:142,w:36,h:26}, n_mightPips:{x:180,y:144,count:10},
-    n_finesseNum:{x:132,y:176,w:36,h:26}, n_finessePips:{x:180,y:178,count:10},
-    n_smartNum:{x:132,y:210,w:36,h:26}, n_smartPips:{x:180,y:212,count:10},
-    n_sneakNum:{x:132,y:244,w:36,h:26}, n_sneakPips:{x:180,y:246,count:10},
+    n_mightNum:{x:132,y:142,w:36,h:26}, n_mightPips:{x:180,y:144,c:10},
+    n_finesseNum:{x:132,y:176,w:36,h:26}, n_finessePips:{x:180,y:178,c:10},
+    n_smartNum:{x:132,y:210,w:36,h:26}, n_smartPips:{x:180,y:212,c:10},
+    n_sneakNum:{x:132,y:244,w:36,h:26}, n_sneakPips:{x:180,y:246,c:10},
     n_life:{x:132,y:282,w:300,h:26},
-
-    // Fantasy powers block (right)
-    f_faithNum:{x:861,y:142,w:36,h:26}, f_faithPips:{x:909,y:144,count:10},
-    f_magicNum:{x:861,y:176,w:36,h:26}, f_magicPips:{x:909,y:178,count:10},
-    f_mysticNum:{x:861,y:210,w:36,h:26}, f_mysticPips:{x:909,y:212,count:10},
-    f_spiritNum:{x:861,y:244,w:36,h:26}, f_spiritPips:{x:909,y:246,count:10},
+    f_faithNum:{x:861,y:142,w:36,h:26}, f_faithPips:{x:909,y:144,c:10},
+    f_magicNum:{x:861,y:176,w:36,h:26}, f_magicPips:{x:909,y:178,c:10},
+    f_mysticNum:{x:861,y:210,w:36,h:26}, f_mysticPips:{x:909,y:212,c:10},
+    f_spiritNum:{x:861,y:244,w:36,h:26}, f_spiritPips:{x:909,y:246,c:10},
     f_death:{x:861,y:282,w:300,h:26},
-
-    // Attack panel (left mid)
-    atk_pips:{x:636,y:0,count:0}, // placeholder (not used)
-    attack10:{x:620,y:0,count:0},
-    attackRow:{x:295,y:0,count:0},
-    attackTop:{x:260,y:372,count:10},
-    weapon1:{x:94,y:404,w:260,h:26},
-    attackMastery1:{x:262,y:404},
-    weapon2:{x:94,y:438,w:260,h:26},
-    attackMastery2:{x:262,y:438},
-
-    // Non‑magic items grid (left bottom): 5 rows × 4 columns
+    attackTop:{x:260,y:372,c:10}, weapon1:{x:94,y:404,w:260,h:26}, attackMastery1:{x:262,y:404}, weapon2:{x:94,y:438,w:260,h:26}, attackMastery2:{x:262,y:438},
     nm1c1:{x:76,y:506,w:247,h:30}, nm1c2:{x:326,y:506,w:247,h:30}, nm1c3:{x:576,y:506,w:247,h:30}, nm1c4:{x:826,y:506,w:247,h:30},
     nm2c1:{x:76,y:538,w:247,h:30}, nm2c2:{x:326,y:538,w:247,h:30}, nm2c3:{x:576,y:538,w:247,h:30}, nm2c4:{x:826,y:538,w:247,h:30},
     nm3c1:{x:76,y:570,w:247,h:30}, nm3c2:{x:326,y:570,w:247,h:30}, nm3c3:{x:576,y:570,w:247,h:30}, nm3c4:{x:826,y:570,w:247,h:30},
     nm4c1:{x:76,y:602,w:247,h:30}, nm4c2:{x:326,y:602,w:247,h:30}, nm4c3:{x:576,y:602,w:247,h:30}, nm4c4:{x:826,y:602,w:247,h:30},
     nm5c1:{x:76,y:634,w:247,h:30}, nm5c2:{x:326,y:634,w:247,h:30}, nm5c3:{x:576,y:634,w:247,h:30}, nm5c4:{x:826,y:634,w:247,h:30},
-
-    // Center column: Traits + Destiny/Fate/Despair
-    traitGritNum:{x:516,y:395,w:38,h:26}, traitGritP:{x:560,y:395,count:5},
-    traitGutsNum:{x:516,y:427,w:38,h:26}, traitGutsP:{x:560,y:427,count:5},
-    traitHeartNum:{x:516,y:459,w:38,h:26}, traitHeartP:{x:560,y:459,count:5},
-    traitFlairNum:{x:516,y:491,w:38,h:26}, traitFlairP:{x:560,y:491,count:5},
-    traitFocusNum:{x:516,y:523,w:38,h:26}, traitFocusP:{x:560,y:523,count:5},
-
+    traitGritNum:{x:516,y:395,w:38,h:26}, traitGritP:{x:560,y:395,c:5},
+    traitGutsNum:{x:516,y:427,w:38,h:26}, traitGutsP:{x:560,y:427,c:5},
+    traitHeartNum:{x:516,y:459,w:38,h:26}, traitHeartP:{x:560,y:459,c:5},
+    traitFlairNum:{x:516,y:491,w:38,h:26}, traitFlairP:{x:560,y:491,c:5},
+    traitFocusNum:{x:516,y:523,w:38,h:26}, traitFocusP:{x:560,y:523,c:5},
     destiny:{x:468,y:588,w:92,h:84}, fateBox:{x:572,y:588,w:92,h:84}, despair:{x:676,y:588,w:92,h:84},
-
-    // Defend panel (right mid)
-    defendTop:{x:896,y:372,count:10},
-    armor1:{x:860,y:404,w:260,h:26}, defendMastery1:{x:1028,y:404},
-    armor2:{x:860,y:438,w:260,h:26}, defendMastery2:{x:1028,y:438},
-
-    // Magic items + Enchantment level (right bottom): 5 rows text + 5×5 pips
-    m1:{x:780,y:506,w:358,h:30}, en1:{x:1150,y:506,count:5},
-    m2:{x:780,y:538,w:358,h:30}, en2:{x:1150,y:538,count:5},
-    m3:{x:780,y:570,w:358,h:30}, en3:{x:1150,y:570,count:5},
-    m4:{x:780,y:602,w:358,h:30}, en4:{x:1150,y:602,count:5},
-    m5:{x:780,y:634,w:358,h:30}, en5:{x:1150,y:634,count:5},
+    defendTop:{x:896,y:372,c:10}, armor1:{x:860,y:404,w:260,h:26}, defendMastery1:{x:1028,y:404}, armor2:{x:860,y:438,w:260,h:26}, defendMastery2:{x:1028,y:438},
+    m1:{x:780,y:506,w:358,h:30}, en1:{x:1150,y:506,c:5}, m2:{x:780,y:538,w:358,h:30}, en2:{x:1150,y:538,c:5}, m3:{x:780,y:570,w:358,h:30}, en3:{x:1150,y:570,c:5}, m4:{x:780,y:602,w:358,h:30}, en4:{x:1150,y:602,c:5}, m5:{x:780,y:634,w:358,h:30}, en5:{x:1150,y:634,c:5}
   };
 
-  // === Build all fields ===
-  // Top text
-  addText('type',L.type.x,L.type.y,L.type.w,L.type.h,'');
-  addText('name',L.name.x,L.name.y,L.name.w,L.name.h,'');
-  addText('title',L.title.x,L.title.y,L.title.w,L.title.h,'');
+  // Build
+  addText('type',L.type.x,L.type.y,L.type.w,L.type.h);
+  addText('name',L.name.x,L.name.y,L.name.w,L.name.h);
+  addText('title',L.title.x,L.title.y,L.title.w,L.title.h);
   addArea('affinity',L.affinity.x,L.affinity.y,L.affinity.w,L.affinity.h);
   addArea('allies',L.allies.x,L.allies.y,L.allies.w,L.allies.h);
-  addPortraitBox('portrait',L.portrait.x,L.portrait.y,L.portrait.w,L.portrait.h); // non-interactive as requested
+  addBox('portrait',L.portrait.x,L.portrait.y,L.portrait.w,L.portrait.h); // non-interactive box
 
-  // Natural powers
-  addNumber('n_mightNum',L.n_mightNum.x,L.n_mightNum.y,L.n_mightNum.w,L.n_mightNum.h);
-  addPips('n_mightPips',L.n_mightPips.x,L.n_mightPips.y,L.n_mightPips.count);
-  addNumber('n_finesseNum',L.n_finesseNum.x,L.n_finesseNum.y,L.n_finesseNum.w,L.n_finesseNum.h);
-  addPips('n_finessePips',L.n_finessePips.x,L.n_finessePips.y,L.n_finessePips.count);
-  addNumber('n_smartNum',L.n_smartNum.x,L.n_smartNum.y,L.n_smartNum.w,L.n_smartNum.h);
-  addPips('n_smartPips',L.n_smartPips.x,L.n_smartPips.y,L.n_smartPips.count);
-  addNumber('n_sneakNum',L.n_sneakNum.x,L.n_sneakNum.y,L.n_sneakNum.w,L.n_sneakNum.h);
-  addPips('n_sneakPips',L.n_sneakPips.x,L.n_sneakPips.y,L.n_sneakPips.count);
+  addNumber('n_mightNum',L.n_mightNum.x,L.n_mightNum.y,L.n_mightNum.w,L.n_mightNum.h); addPips('n_mightPips',L.n_mightPips.x,L.n_mightPips.y,L.n_mightPips.c);
+  addNumber('n_finesseNum',L.n_finesseNum.x,L.n_finesseNum.y,L.n_finesseNum.w,L.n_finesseNum.h); addPips('n_finessePips',L.n_finessePips.x,L.n_finessePips.y,L.n_finessePips.c);
+  addNumber('n_smartNum',L.n_smartNum.x,L.n_smartNum.y,L.n_smartNum.w,L.n_smartNum.h); addPips('n_smartPips',L.n_smartPips.x,L.n_smartPips.y,L.n_smartPips.c);
+  addNumber('n_sneakNum',L.n_sneakNum.x,L.n_sneakNum.y,L.n_sneakNum.w,L.n_sneakNum.h); addPips('n_sneakPips',L.n_sneakPips.x,L.n_sneakPips.y,L.n_sneakPips.c);
   addText('n_life',L.n_life.x,L.n_life.y,L.n_life.w,L.n_life.h);
 
-  // Fantasy powers
-  addNumber('f_faithNum',L.f_faithNum.x,L.f_faithNum.y,L.f_faithNum.w,L.f_faithNum.h);
-  addPips('f_faithPips',L.f_faithPips.x,L.f_faithPips.y,L.f_faithPips.count);
-  addNumber('f_magicNum',L.f_magicNum.x,L.f_magicNum.y,L.f_magicNum.w,L.f_magicNum.h);
-  addPips('f_magicPips',L.f_magicPips.x,L.f_magicPips.y,L.f_magicPips.count);
-  addNumber('f_mysticNum',L.f_mysticNum.x,L.f_mysticNum.y,L.f_mysticNum.w,L.f_mysticNum.h);
-  addPips('f_mysticPips',L.f_mysticPips.x,L.f_mysticPips.y,L.f_mysticPips.count);
-  addNumber('f_spiritNum',L.f_spiritNum.x,L.f_spiritNum.y,L.f_spiritNum.w,L.f_spiritNum.h);
-  addPips('f_spiritPips',L.f_spiritPips.x,L.f_spiritPips.y,L.f_spiritPips.count);
+  addNumber('f_faithNum',L.f_faithNum.x,L.f_faithNum.y,L.f_faithNum.w,L.f_faithNum.h); addPips('f_faithPips',L.f_faithPips.x,L.f_faithPips.y,L.f_faithPips.c);
+  addNumber('f_magicNum',L.f_magicNum.x,L.f_magicNum.y,L.f_magicNum.w,L.f_magicNum.h); addPips('f_magicPips',L.f_magicPips.x,L.f_magicPips.y,L.f_magicPips.c);
+  addNumber('f_mysticNum',L.f_mysticNum.x,L.f_mysticNum.y,L.f_mysticNum.w,L.f_mysticNum.h); addPips('f_mysticPips',L.f_mysticPips.x,L.f_mysticPips.y,L.f_mysticPips.c);
+  addNumber('f_spiritNum',L.f_spiritNum.x,L.f_spiritNum.y,L.f_spiritNum.w,L.f_spiritNum.h); addPips('f_spiritPips',L.f_spiritPips.x,L.f_spiritPips.y,L.f_spiritPips.c);
   addText('f_death',L.f_death.x,L.f_death.y,L.f_death.w,L.f_death.h);
 
-  // Attack panel
   addPips('attackTop',L.attackTop.x,L.attackTop.y,10);
-  addText('weapon1',L.weapon1.x,L.weapon1.y,L.weapon1.w,L.weapon1.h);
-  addMastery('attackMastery1',L.attackMastery1.x,L.attackMastery1.y);
-  addText('weapon2',L.weapon2.x,L.weapon2.y,L.weapon2.w,L.weapon2.h);
-  addMastery('attackMastery2',L.attackMastery2.x,L.attackMastery2.y);
+  addText('weapon1',L.weapon1.x,L.weapon1.y,L.weapon1.w,L.weapon1.h); addMastery('attackMastery1',L.attackMastery1.x,L.attackMastery1.y);
+  addText('weapon2',L.weapon2.x,L.weapon2.y,L.weapon2.w,L.weapon2.h); addMastery('attackMastery2',L.attackMastery2.x,L.attackMastery2.y);
 
-  // Non‑magic item grid (5×4)
-  ['1','2','3','4','5'].forEach(r=>{
-    ['c1','c2','c3','c4'].forEach(c=>{
-      const key = 'nm'+r+c; const pos=L[key]; addText(key,pos.x,pos.y,pos.w,pos.h);
-    });
-  });
+  ;['1','2','3','4','5'].forEach(r=>{['c1','c2','c3','c4'].forEach(c=>{const k='nm'+r+c;const p=L[k];addText(k,p.x,p.y,p.w,p.h);});});
 
-  // Traits with 5 pips each + numeric box
-  addNumber('traitGritNum',L.traitGritNum.x,L.traitGritNum.y,L.traitGritNum.w,L.traitGritNum.h);
-  addPips('traitGritP',L.traitGritP.x,L.traitGritP.y,5);
-  addNumber('traitGutsNum',L.traitGutsNum.x,L.traitGutsNum.y,L.traitGutsNum.w,L.traitGutsNum.h);
-  addPips('traitGutsP',L.traitGutsP.x,L.traitGutsP.y,5);
-  addNumber('traitHeartNum',L.traitHeartNum.x,L.traitHeartNum.y,L.traitHeartNum.w,L.traitHeartNum.h);
-  addPips('traitHeartP',L.traitHeartP.x,L.traitHeartP.y,5);
-  addNumber('traitFlairNum',L.traitFlairNum.x,L.traitFlairNum.y,L.traitFlairNum.w,L.traitFlairNum.h);
-  addPips('traitFlairP',L.traitFlairP.x,L.traitFlairP.y,5);
-  addNumber('traitFocusNum',L.traitFocusNum.x,L.traitFocusNum.y,L.traitFocusNum.w,L.traitFocusNum.h);
-  addPips('traitFocusP',L.traitFocusP.x,L.traitFocusP.y,5);
+  addNumber('traitGritNum',L.traitGritNum.x,L.traitGritNum.y,L.traitGritNum.w,L.traitGritNum.h); addPips('traitGritP',L.traitGritP.x,L.traitGritP.y,L.traitGritP.c);
+  addNumber('traitGutsNum',L.traitGutsNum.x,L.traitGutsNum.y,L.traitGutsNum.w,L.traitGutsNum.h); addPips('traitGutsP',L.traitGutsP.x,L.traitGutsP.y,L.traitGutsP.c);
+  addNumber('traitHeartNum',L.traitHeartNum.x,L.traitHeartNum.y,L.traitHeartNum.w,L.traitHeartNum.h); addPips('traitHeartP',L.traitHeartP.x,L.traitHeartP.y,L.traitHeartP.c);
+  addNumber('traitFlairNum',L.traitFlairNum.x,L.traitFlairNum.y,L.traitFlairNum.w,L.traitFlairNum.h); addPips('traitFlairP',L.traitFlairP.x,L.traitFlairP.y,L.traitFlairP.c);
+  addNumber('traitFocusNum',L.traitFocusNum.x,L.traitFocusNum.y,L.traitFocusNum.w,L.traitFocusNum.h); addPips('traitFocusP',L.traitFocusP.x,L.traitFocusP.y,L.traitFocusP.c);
 
-  // Destiny / Fate / Despair (square boxes)
   addNumber('destiny',L.destiny.x,L.destiny.y,L.destiny.w,L.destiny.h);
   addNumber('fateBox',L.fateBox.x,L.fateBox.y,L.fateBox.w,L.fateBox.h);
   addNumber('despair',L.despair.x,L.despair.y,L.despair.w,L.despair.h);
 
-  // Defend panel
   addPips('defendTop',L.defendTop.x,L.defendTop.y,10);
-  addText('armor1',L.armor1.x,L.armor1.y,L.armor1.w,L.armor1.h);
-  addMastery('defendMastery1',L.defendMastery1.x,L.defendMastery1.y);
-  addText('armor2',L.armor2.x,L.armor2.y,L.armor2.w,L.armor2.h);
-  addMastery('defendMastery2',L.defendMastery2.x,L.defendMastery2.y);
+  addText('armor1',L.armor1.x,L.armor1.y,L.armor1.w,L.armor1.h); addMastery('defendMastery1',L.defendMastery1.x,L.defendMastery1.y);
+  addText('armor2',L.armor2.x,L.armor2.y,L.armor2.w,L.armor2.h); addMastery('defendMastery2',L.defendMastery2.x,L.defendMastery2.y);
 
-  // Magic items + enchantment pips (5 rows)
-  for(let i=1;i<=5;i++){
-    const m=L['m'+i]; addText('m'+i,m.x,m.y,m.w,m.h);
-    const en=L['en'+i]; const row=addPips('en'+i,en.x,en.y,5);
-    row.classList.add('enchant');
-  }
+  for(let i=1;i<=5;i++){const m=L['m'+i];addText('m'+i,m.x,m.y,m.w,m.h);const en=L['en'+i];addPips('en'+i,en.x,en.y,en.c);}
 
-  // === Edit mode (optional) ===
+  // Edit mode (Shift+drag to nudge)
   let edit=false, dragTarget=null, ox=0, oy=0, sx=0, sy=0;
-  document.getElementById('toggleEdit').addEventListener('click',()=>{
-    edit=!edit; document.body.classList.toggle('drag-on',edit);
-  });
-  sheet.addEventListener('pointerdown',e=>{
-    if(!edit || !e.shiftKey) return; // require Shift to drag
-    const t=e.target.closest('.draggable');
-    if(!t) return; dragTarget=t; sx=e.clientX; sy=e.clientY; const r=t.getBoundingClientRect(); const rs=sheet.getBoundingClientRect(); ox=r.left-rs.left; oy=r.top-rs.top; t.setPointerCapture(e.pointerId);
-  });
-  sheet.addEventListener('pointermove',e=>{
-    if(!dragTarget) return; const rs=sheet.getBoundingClientRect(); const nx=Math.min(SHEET_W-10,Math.max(0, ox+(e.clientX-sx))); const ny=Math.min(SHEET_H-10,Math.max(0, oy+(e.clientY-sy))); dragTarget.style.left=nx+'px'; dragTarget.style.top=ny+'px';
-  });
-  sheet.addEventListener('pointerup',()=>{dragTarget=null;saveLayout()});
+  document.getElementById('toggleEdit').addEventListener('click',()=>{edit=!edit;document.body.classList.toggle('drag-on',edit)});
+  sheet.addEventListener('pointerdown',e=>{if(!edit||!e.shiftKey)return;const t=e.target.closest('.draggable');if(!t)return;dragTarget=t;sx=e.clientX;sy=e.clientY;const r=t.getBoundingClientRect();const rs=sheet.getBoundingClientRect();ox=r.left-rs.left;oy=r.top-rs.top;t.setPointerCapture(e.pointerId)});
+  sheet.addEventListener('pointermove',e=>{if(!dragTarget)return;const nx=Math.min(SHEET_W-10,Math.max(0,ox+(e.clientX-sx)));const ny=Math.min(SHEET_H-10,Math.max(0,oy+(e.clientY-sy)));dragTarget.style.left=nx+'px';dragTarget.style.top=ny+'px'});
+  sheet.addEventListener('pointerup',()=>{if(!dragTarget)return;dragTarget=null;saveLayout()});
+  function saveLayout(){const pos={};sheet.querySelectorAll('.draggable').forEach(el=>{const id=el.id;if(!id)return;const r=el.getBoundingClientRect();const rs=sheet.getBoundingClientRect();pos[id]={x:Math.round(r.left-rs.left),y:Math.round(r.top-rs.top),w:Math.round(r.width),h:Math.round(r.height)}});localStorage.setItem('saga_layout',JSON.stringify(pos))}
+  (function load(){try{const pos=JSON.parse(localStorage.getItem('saga_layout')||'null');if(!pos)return;Object.entries(pos).forEach(([id,box])=>{const el=document.getElementById(id);if(!el)return;style(el,box.x,box.y,box.w,box.h)})}catch{}})();
 
-  function saveLayout(){
-    const pos={}; sheet.querySelectorAll('.draggable').forEach(el=>{const id=el.id; if(!id) return; const r=el.getBoundingClientRect(); const rs=sheet.getBoundingClientRect(); pos[id]={x:Math.round(r.left-rs.left), y:Math.round(r.top-rs.top), w:Math.round(r.width), h:Math.round(r.height)};});
-    localStorage.setItem('saga_layout', JSON.stringify(pos));
-  }
-  function loadLayout(){
-    try{const pos=JSON.parse(localStorage.getItem('saga_layout')||'null'); if(!pos) return; Object.entries(pos).forEach(([id,box])=>{const el=document.getElementById(id); if(!el) return; style(el,box.x,box.y,box.w,box.h)});}catch{}
-  }
-  loadLayout();
+  // Export
+  document.getElementById('savePdf').addEventListener('click',()=>{const opt={filename:(document.getElementById('name')?.value||'saga-character')+'.pdf',html2canvas:{scale:2,useCORS:true},jsPDF:{unit:'px',format:[SHEET_W,SHEET_H],orientation:'landscape'}};html2pdf().set(opt).from(sheet).save()});
 
-  // === Save as PDF ===
-  document.getElementById('savePdf').addEventListener('click',()=>{
-    const opt={filename:(document.getElementById('name')?.value||'saga-character')+'.pdf',html2canvas:{scale:2,useCORS:true},jsPDF:{unit:'px',format:[SHEET_W,SHEET_H],orientation:'landscape'}};
-    html2pdf().set(opt).from(sheet).save();
-  });
-
-  // === Blank sheet ===
-  document.getElementById('blank').addEventListener('click',()=>{
-    sheet.querySelectorAll('input[type=text], textarea, input[type=number]').forEach(el=>el.value='');
-    sheet.querySelectorAll('.pip-row').forEach(w=>{w.dataset.value=0;updatePips(w)});
-    sheet.querySelectorAll('.mastery').forEach(mc=>{mc.dataset.value=-1;updateMastery(mc)});
-  });
+  // Reset
+  document.getElementById('blank').addEventListener('click',()=>{sheet.querySelectorAll('input[type=text], textarea, input[type=number]').forEach(el=>el.value='');sheet.querySelectorAll('.pip-row').forEach(w=>{w.dataset.value=0;updatePips(w)});sheet.querySelectorAll('.mastery').forEach(mc=>{mc.dataset.value=-1;updateMastery(mc)})});
   </script>
 </body>
 </html>
