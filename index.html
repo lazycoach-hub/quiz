@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>SAGA Character Sheet — Exact Overlay (with Calibration)</title>
+  <title>SAGA Character Sheet — Exact Overlay (Per‑Section Calibration)</title>
   <style>
     :root{--ink:#111;--muted:#6b7280;--pip:18px;--pip-b:2px}
     html,body{margin:0;background:#222;color:#111;font:14px/1.35 Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
@@ -34,11 +34,12 @@
     .tiny{font-size:12px;color:#eee;margin-left:6px}
 
     /* Calibration panel */
-    .cal{position:fixed;left:12px;top:12px;background:#fff;border:1px solid #111;border-radius:10px;padding:10px;display:none;z-index:9999}
+    .cal{position:fixed;left:12px;top:12px;background:#fff;border:1px solid #111;border-radius:10px;padding:10px;display:none;z-index:9999;min-width:360px}
     .cal h3{margin:0 0 6px 0;font-size:13px}
-    .cal .row{display:grid;grid-template-columns:90px 1fr 50px;gap:6px;align-items:center;margin:6px 0}
+    .cal .row{display:grid;grid-template-columns:110px 1fr 64px;gap:6px;align-items:center;margin:6px 0}
     .cal .row input[type=range]{width:220px}
-    .cal .row input[type=number]{width:60px}
+    .cal .row input[type=number]{width:64px}
+    .cal .row select{width:220px}
   </style>
 </head>
 <body>
@@ -47,18 +48,26 @@
     <button class="btn" id="blank">Blank Sheet</button>
     <button class="btn" id="toggleEdit" title="Hold Shift to drag when ON">Edit Mode</button>
     <button class="btn" id="toggleCal">Calibrate</button>
-    <span class="tiny">Sheet is locked to 1186×768 px to match the background exactly. Use <b>Calibrate</b> to align everything at once.</span>
+    <span class="tiny">Sheet is locked to 1186×768 px. Use <b>Calibrate</b> (global + per‑section) to line everything up once.</span>
   </div>
 
   <!-- Calibration controls -->
   <div class="cal" id="cal">
     <h3>Calibration</h3>
-    <div class="row"><label>Offset X</label><input type="range" id="oxR" min="-200" max="200" step="1"><input type="number" id="oxN" step="1"></div>
-    <div class="row"><label>Offset Y</label><input type="range" id="oyR" min="-200" max="200" step="1"><input type="number" id="oyN" step="1"></div>
-    <div class="row"><label>Scale X</label><input type="range" id="sxR" min="0.80" max="1.20" step="0.002"><input type="number" id="sxN" step="0.001"></div>
-    <div class="row"><label>Scale Y</label><input type="range" id="syR" min="0.80" max="1.20" step="0.002"><input type="number" id="syN" step="0.001"></div>
+    <div class="row"><label>Background file</label><input type="text" id="bgPath" placeholder="saga_character_sheet.png"><button id="bgApply">Apply</button></div>
+    <div class="row"><label>Offset X (global)</label><input type="range" id="oxR" min="-300" max="300" step="1"><input type="number" id="oxN" step="1"></div>
+    <div class="row"><label>Offset Y (global)</label><input type="range" id="oyR" min="-300" max="300" step="1"><input type="number" id="oyN" step="1"></div>
+    <div class="row"><label>Scale X (global)</label><input type="range" id="sxR" min="0.90" max="1.10" step="0.001"><input type="number" id="sxN" step="0.001"></div>
+    <div class="row"><label>Scale Y (global)</label><input type="range" id="syR" min="0.90" max="1.10" step="0.001"><input type="number" id="syN" step="0.001"></div>
+    <hr/>
+    <div class="row"><label>Section</label><select id="sectionSel"></select><div></div></div>
+    <div class="row"><label>Section X offset</label><input type="range" id="gxR" min="-200" max="200" step="1"><input type="number" id="gxN" step="1"></div>
+    <div class="row"><label>Section Y offset</label><input type="range" id="gyR" min="-200" max="200" step="1"><input type="number" id="gyN" step="1"></div>
+    <div class="row"><label>Section scale X</label><input type="range" id="gsxR" min="0.95" max="1.05" step="0.001"><input type="number" id="gsxN" step="0.001"></div>
+    <div class="row"><label>Section scale Y</label><input type="range" id="gsyR" min="0.95" max="1.05" step="0.001"><input type="number" id="gsyN" step="0.001"></div>
+    <hr/>
     <div class="row"><label>Pip size</label><input type="range" id="psR" min="12" max="28" step="1"><input type="number" id="psN" step="1"></div>
-    <div class="row"><label>Border</label><input type="range" id="pbR" min="1" max="4" step="0.5"><input type="number" id="pbN" step="0.5"></div>
+    <div class="row"><label>Pip border</label><input type="range" id="pbR" min="1" max="4" step="0.5"><input type="number" id="pbN" step="0.5"></div>
     <div class="row" style="grid-template-columns:1fr 1fr"><button id="calReset">Reset</button><button id="calClose">Close</button></div>
   </div>
 
@@ -74,136 +83,154 @@
   <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
   <script>
   const SHEET_W=1186, SHEET_H=768; const sheet=document.getElementById('sheet');
-  // Allow bg override and show error if missing
-  (function(){const p=new URLSearchParams(location.search);const bg=document.getElementById('bg');const err=document.getElementById('bgError');const src=p.get('bg')||bg.getAttribute('src');bg.src=src;bg.addEventListener('error',()=>{if(err) err.style.display='grid'});})();
+  // Bg override via ?bg= and error if missing
+  (function(){const p=new URLSearchParams(location.search);const bg=document.getElementById('bg');const err=document.getElementById('bgError');const src=p.get('bg')||bg.getAttribute('src');bg.src=src;bg.addEventListener('error',()=>{if(err) err.style.display='grid'});document.getElementById('bgPath').value=src;document.getElementById('bgApply').onclick=()=>{bg.src=document.getElementById('bgPath').value}})();
 
   // === Calibration state ===
-  const CAL = (function(){try{return JSON.parse(localStorage.getItem('saga_cal')||'{}')}catch{return{}}})();
+  const SEC_KEYS=['top','nat','fan','atk','nm','traits','fate','def','magic'];
+  const CAL=(function(){try{return JSON.parse(localStorage.getItem('saga_cal_groups')||'{}')}catch{return{}}})();
+  // defaults
   if(CAL.ox==null){CAL.ox=0} if(CAL.oy==null){CAL.oy=0} if(CAL.sx==null){CAL.sx=1} if(CAL.sy==null){CAL.sy=1} if(CAL.ps==null){CAL.ps=18} if(CAL.pb==null){CAL.pb=2}
-
-  // Wire calibration UI
-  const calEl=document.getElementById('cal');
-  const bind=(rid,nid,key)=>{const r=document.getElementById(rid), n=document.getElementById(nid);const set=v=>{CAL[key]=+v;r.value=v;n.value=v;reflow();saveCal()};r.oninput=e=>set(e.target.value);n.oninput=e=>set(e.target.value);set(CAL[key])};
-  document.getElementById('toggleCal').onclick=()=>{calEl.style.display=calEl.style.display==='none'||!calEl.style.display?'block':'none'};
-  document.getElementById('calClose').onclick=()=>calEl.style.display='none';
-  document.getElementById('calReset').onclick=()=>{CAL.ox=0;CAL.oy=0;CAL.sx=1;CAL.sy=1;CAL.ps=18;CAL.pb=2;bind('oxR','oxN','ox');bind('oyR','oyN','oy');bind('sxR','sxN','sx');bind('syR','syN','sy');bind('psR','psN','ps');bind('pbR','pbN','pb');};
-  bind('oxR','oxN','ox'); bind('oyR','oyN','oy'); bind('sxR','sxN','sx'); bind('syR','syN','sy'); bind('psR','psN','ps'); bind('pbR','pbN','pb');
-  function saveCal(){localStorage.setItem('saga_cal', JSON.stringify(CAL))}
+  if(!CAL.groups){CAL.groups={}}; SEC_KEYS.forEach(k=>{CAL.groups[k]=Object.assign({ox:0,oy:0,sx:1,sy:1},CAL.groups[k]||{})});
 
   // Builders (store base coords; compute with calibration on reflow)
-  function styleBase(el,x,y,w,h){el.dataset.x=x;el.dataset.y=y;if(w!=null) el.dataset.w=w; if(h!=null) el.dataset.h=h;}
-  function apply(el){const x=+el.dataset.x, y=+el.dataset.y; const w=+el.dataset.w, h=+el.dataset.h; el.style.left=(CAL.ox + x*CAL.sx)+'px'; el.style.top=(CAL.oy + y*CAL.sy)+'px'; if(!isNaN(w)) el.style.width=(w*CAL.sx)+'px'; if(!isNaN(h)) el.style.height=(h*CAL.sy)+'px';}
-  function addText(id,x,y,w,h){const el=document.createElement('input');el.type='text';el.id=id;el.className='field draggable';styleBase(el,x,y,w,h);sheet.appendChild(el);apply(el);return el}
-  function addArea(id,x,y,w,h){const el=document.createElement('textarea');el.id=id;el.className='field draggable';styleBase(el,x,y,w,h);sheet.appendChild(el);apply(el);return el}
-  function addNumber(id,x,y,w,h){const el=document.createElement('input');el.type='number';el.id=id;el.className='field draggable';styleBase(el,x,y,w,h);sheet.appendChild(el);apply(el);return el}
-  function addBox(id,x,y,w,h){const el=document.createElement('div');el.id=id;el.className='field draggable';styleBase(el,x,y,w,h);el.style.border='1px solid transparent';sheet.appendChild(el);apply(el);return el}
-  function addPips(id,x,y,count){const wrap=document.createElement('div');wrap.id=id;wrap.className='pip-row draggable';styleBase(wrap,x,y);sheet.appendChild(wrap);for(let i=0;i<count;i++){const b=document.createElement('div');b.className='pip';b.dataset.index=i;wrap.appendChild(b)}wrap.addEventListener('click',e=>{const t=e.target;if(!t.classList.contains('pip'))return;const idx=+t.dataset.index;const v=+(wrap.dataset.value||0);wrap.dataset.value=(idx+1===v)?0:(idx+1);updatePips(wrap)});updatePips(wrap);apply(wrap);return wrap}
+  function styleBase(el,sec,x,y,w,h){el.dataset.sec=sec;el.dataset.x=x;el.dataset.y=y;if(w!=null) el.dataset.w=w; if(h!=null) el.dataset.h=h;}
+  function apply(el){const g=CAL.groups[el.dataset.sec]||{ox:0,oy:0,sx:1,sy:1};const x=+el.dataset.x, y=+el.dataset.y; const w=+el.dataset.w, h=+el.dataset.h; const X = CAL.ox + (g.ox + x*g.sx)*CAL.sx; const Y = CAL.oy + (g.oy + y*g.sy)*CAL.sy; el.style.left=X+'px'; el.style.top=Y+'px'; if(!isNaN(w)) el.style.width=(w*g.sx*CAL.sx)+'px'; if(!isNaN(h)) el.style.height=(h*g.sy*CAL.sy)+'px';}
+  function addText(id,sec,x,y,w,h){const el=document.createElement('input');el.type='text';el.id=id;el.className='field draggable';styleBase(el,sec,x,y,w,h);sheet.appendChild(el);apply(el);return el}
+  function addArea(id,sec,x,y,w,h){const el=document.createElement('textarea');el.id=id;el.className='field draggable';styleBase(el,sec,x,y,w,h);sheet.appendChild(el);apply(el);return el}
+  function addNumber(id,sec,x,y,w,h){const el=document.createElement('input');el.type='number';el.id=id;el.className='field draggable';styleBase(el,sec,x,y,w,h);sheet.appendChild(el);apply(el);return el}
+  function addBox(id,sec,x,y,w,h){const el=document.createElement('div');el.id=id;el.className='field draggable';styleBase(el,sec,x,y,w,h);el.style.border='1px solid transparent';sheet.appendChild(el);apply(el);return el}
+  function addPips(id,sec,x,y,count){const wrap=document.createElement('div');wrap.id=id;wrap.className='pip-row draggable';styleBase(wrap,sec,x,y);sheet.appendChild(wrap);for(let i=0;i<count;i++){const b=document.createElement('div');b.className='pip';b.dataset.index=i;wrap.appendChild(b)}wrap.addEventListener('click',e=>{const t=e.target;if(!t.classList.contains('pip'))return;const idx=+t.dataset.index;const v=+(wrap.dataset.value||0);wrap.dataset.value=(idx+1===v)?0:(idx+1);updatePips(wrap)});updatePips(wrap);apply(wrap);return wrap}
   function updatePips(wrap){const v=+(wrap.dataset.value||0);[...wrap.children].forEach((p,i)=>p.classList.toggle('filled',i<v))}
-  function addMastery(id,x,y){const mc=document.createElement('div');mc.id=id;mc.className='mastery draggable';styleBase(mc,x,y);const labels=document.createElement('div');labels.className='labels';['B','Pr','Sk','Ad','Ex','El','M','GM','SM','A'].forEach(a=>{const s=document.createElement('span');s.textContent=a;labels.appendChild(s)});const dots=document.createElement('div');dots.className='dots';for(let i=0;i<10;i++){const d=document.createElement('div');d.className='pip';d.dataset.index=i;dots.appendChild(d)}mc.appendChild(labels);mc.appendChild(dots);dots.addEventListener('click',e=>{const t=e.target;if(!t.classList.contains('pip'))return;const idx=+t.dataset.index;const v=+(mc.dataset.value||-1);mc.dataset.value=(v===idx)?-1:idx;updateMastery(mc)});sheet.appendChild(mc);updateMastery(mc);apply(mc);return mc}
+  function addMastery(id,sec,x,y){const mc=document.createElement('div');mc.id=id;mc.className='mastery draggable';styleBase(mc,sec,x,y);const labels=document.createElement('div');labels.className='labels';['B','Pr','Sk','Ad','Ex','El','M','GM','SM','A'].forEach(a=>{const s=document.createElement('span');s.textContent=a;labels.appendChild(s)});const dots=document.createElement('div');dots.className='dots';for(let i=0;i<10;i++){const d=document.createElement('div');d.className='pip';d.dataset.index=i;dots.appendChild(d)}mc.appendChild(labels);mc.appendChild(dots);dots.addEventListener('click',e=>{const t=e.target;if(!t.classList.contains('pip'))return;const idx=+t.dataset.index;const v=+(mc.dataset.value||-1);mc.dataset.value=(v===idx)?-1:idx;updateMastery(mc)});sheet.appendChild(mc);updateMastery(mc);apply(mc);return mc}
   function updateMastery(mc){const sel=+(mc.dataset.value||-1);mc.querySelectorAll('.pip').forEach((d,i)=>d.classList.toggle('filled', sel>=0 && i<=sel))}
 
   function reflow(){
-    // update element positions
     sheet.querySelectorAll('.draggable').forEach(apply);
-    // scale pip sizes with calibration
     document.documentElement.style.setProperty('--pip', CAL.ps+'px');
     document.documentElement.style.setProperty('--pip-b', CAL.pb+'px');
-    // adjust mastery label spacing slightly with scale
-    sheet.querySelectorAll('.mastery .labels').forEach(l=>{l.style.gap=(14*CAL.sx)+'px'; l.style.top=(-16*CAL.sy)+'px'; l.style.left=(2*CAL.sx)+'px'});
-    sheet.querySelectorAll('.mastery .dots').forEach(d=>{d.style.gap=(8*CAL.sx)+'px'});
+    sheet.querySelectorAll('.mastery .labels').forEach(l=>{const g=CAL.groups[l.parentElement.dataset.sec]; l.style.gap=(14*g.sx*CAL.sx)+'px'; l.style.top=(-16*g.sy*CAL.sy)+'px'; l.style.left=(2*g.sx*CAL.sx)+'px'});
+    sheet.querySelectorAll('.mastery .dots').forEach(d=>{const g=CAL.groups[d.parentElement.dataset.sec]; d.style.gap=(8*g.sx*CAL.sx)+'px'});
   }
 
   // === Coordinates (base, uncalibrated) ===
   const L={
-    // top row
+    // top row (section 'top')
     type:[170,20,240,24], name:[466,20,260,24], title:[805,20,210,24],
     affinity:[40,72,353,34], allies:[794,72,353,34], portrait:[466,74,256,320],
 
-    // Natural powers
+    // Natural powers ('nat')
     n_mightNum:[132,142,36,26], n_mightPips:[180,144],
     n_finesseNum:[132,176,36,26], n_finessePips:[180,178],
     n_smartNum:[132,210,36,26], n_smartPips:[180,212],
     n_sneakNum:[132,244,36,26], n_sneakPips:[180,246],
     n_life:[132,282,300,26],
 
-    // Fantasy powers
+    // Fantasy powers ('fan')
     f_faithNum:[861,142,36,26], f_faithPips:[909,144],
     f_magicNum:[861,176,36,26], f_magicPips:[909,178],
     f_mysticNum:[861,210,36,26], f_mysticPips:[909,212],
     f_spiritNum:[861,244,36,26], f_spiritPips:[909,246],
     f_death:[861,282,300,26],
 
-    // Attack (left mid)
+    // Attack ('atk')
     attackTop:[260,372], weapon1:[94,404,260,26], attackMastery1:[262,404], weapon2:[94,438,260,26], attackMastery2:[262,438],
 
-    // Non‑magic items grid (5×4)
+    // Non‑magic items ('nm') 5×4
     nm1c1:[76,506,247,30], nm1c2:[326,506,247,30], nm1c3:[576,506,247,30], nm1c4:[826,506,247,30],
     nm2c1:[76,538,247,30], nm2c2:[326,538,247,30], nm2c3:[576,538,247,30], nm2c4:[826,538,247,30],
     nm3c1:[76,570,247,30], nm3c2:[326,570,247,30], nm3c3:[576,570,247,30], nm3c4:[826,570,247,30],
     nm4c1:[76,602,247,30], nm4c2:[326,602,247,30], nm4c3:[576,602,247,30], nm4c4:[826,602,247,30],
     nm5c1:[76,634,247,30], nm5c2:[326,634,247,30], nm5c3:[576,634,247,30], nm5c4:[826,634,247,30],
 
-    // Traits center
+    // Traits ('traits')
     traitGritNum:[516,395,38,26], traitGritP:[560,395],
     traitGutsNum:[516,427,38,26], traitGutsP:[560,427],
     traitHeartNum:[516,459,38,26], traitHeartP:[560,459],
     traitFlairNum:[516,491,38,26], traitFlairP:[560,491],
     traitFocusNum:[516,523,38,26], traitFocusP:[560,523],
 
+    // Fate ('fate')
     destiny:[468,588,92,84], fateBox:[572,588,92,84], despair:[676,588,92,84],
 
-    // Defend (right mid)
+    // Defend ('def')
     defendTop:[896,372], armor1:[860,404,260,26], defendMastery1:[1028,404], armor2:[860,438,260,26], defendMastery2:[1028,438],
 
-    // Magic items + enchant pips
+    // Magic items ('magic')
     m1:[780,506,358,30], en1:[1150,506], m2:[780,538,358,30], en2:[1150,538], m3:[780,570,358,30], en3:[1150,570], m4:[780,602,358,30], en4:[1150,602], m5:[780,634,358,30], en5:[1150,634]
   };
 
-  // Build
-  addText('type',...L.type); addText('name',...L.name); addText('title',...L.title);
-  addArea('affinity',...L.affinity); addArea('allies',...L.allies);
-  addBox('portrait',...L.portrait);
+  // Build elements into their sections
+  // top
+  addText('type','top',...L.type); addText('name','top',...L.name); addText('title','top',...L.title);
+  addArea('affinity','top',...L.affinity); addArea('allies','top',...L.allies);
+  addBox('portrait','top',...L.portrait);
 
-  addNumber('n_mightNum',...L.n_mightNum); addPips('n_mightPips',...L.n_mightPips,10);
-  addNumber('n_finesseNum',...L.n_finesseNum); addPips('n_finessePips',...L.n_finessePips,10);
-  addNumber('n_smartNum',...L.n_smartNum); addPips('n_smartPips',...L.n_smartPips,10);
-  addNumber('n_sneakNum',...L.n_sneakNum); addPips('n_sneakPips',...L.n_sneakPips,10);
-  addText('n_life',...L.n_life);
+  // nat + fan
+  addNumber('n_mightNum','nat',...L.n_mightNum); addPips('n_mightPips','nat',...L.n_mightPips,10);
+  addNumber('n_finesseNum','nat',...L.n_finesseNum); addPips('n_finessePips','nat',...L.n_finessePips,10);
+  addNumber('n_smartNum','nat',...L.n_smartNum); addPips('n_smartPips','nat',...L.n_smartPips,10);
+  addNumber('n_sneakNum','nat',...L.n_sneakNum); addPips('n_sneakPips','nat',...L.n_sneakPips,10);
+  addText('n_life','nat',...L.n_life);
 
-  addNumber('f_faithNum',...L.f_faithNum); addPips('f_faithPips',...L.f_faithPips,10);
-  addNumber('f_magicNum',...L.f_magicNum); addPips('f_magicPips',...L.f_magicPips,10);
-  addNumber('f_mysticNum',...L.f_mysticNum); addPips('f_mysticPips',...L.f_mysticPips,10);
-  addNumber('f_spiritNum',...L.f_spiritNum); addPips('f_spiritPips',...L.f_spiritPips,10);
-  addText('f_death',...L.f_death);
+  addNumber('f_faithNum','fan',...L.f_faithNum); addPips('f_faithPips','fan',...L.f_faithPips,10);
+  addNumber('f_magicNum','fan',...L.f_magicNum); addPips('f_magicPips','fan',...L.f_magicPips,10);
+  addNumber('f_mysticNum','fan',...L.f_mysticNum); addPips('f_mysticPips','fan',...L.f_mysticPips,10);
+  addNumber('f_spiritNum','fan',...L.f_spiritNum); addPips('f_spiritPips','fan',...L.f_spiritPips,10);
+  addText('f_death','fan',...L.f_death);
 
-  addPips('attackTop',...L.attackTop,10);
-  addText('weapon1',...L.weapon1); addMastery('attackMastery1',...L.attackMastery1);
-  addText('weapon2',...L.weapon2); addMastery('attackMastery2',...L.attackMastery2);
+  // attack
+  addPips('attackTop','atk',...L.attackTop,10);
+  addText('weapon1','atk',...L.weapon1); addMastery('attackMastery1','atk',...L.attackMastery1);
+  addText('weapon2','atk',...L.weapon2); addMastery('attackMastery2','atk',...L.attackMastery2);
 
-  ['1','2','3','4','5'].forEach(r=>['c1','c2','c3','c4'].forEach(c=>{const k='nm'+r+c;addText(k,...L[k])}));
+  // non-magic grid
+  ['1','2','3','4','5'].forEach(r=>['c1','c2','c3','c4'].forEach(c=>{const k='nm'+r+c;addText(k,'nm',...L[k])}));
 
-  addNumber('traitGritNum',...L.traitGritNum); addPips('traitGritP',...L.traitGritP,5);
-  addNumber('traitGutsNum',...L.traitGutsNum); addPips('traitGutsP',...L.traitGutsP,5);
-  addNumber('traitHeartNum',...L.traitHeartNum); addPips('traitHeartP',...L.traitHeartP,5);
-  addNumber('traitFlairNum',...L.traitFlairNum); addPips('traitFlairP',...L.traitFlairP,5);
-  addNumber('traitFocusNum',...L.traitFocusNum); addPips('traitFocusP',...L.traitFocusP,5);
+  // traits
+  addNumber('traitGritNum','traits',...L.traitGritNum); addPips('traitGritP','traits',...L.traitGritP,5);
+  addNumber('traitGutsNum','traits',...L.traitGutsNum); addPips('traitGutsP','traits',...L.traitGutsP,5);
+  addNumber('traitHeartNum','traits',...L.traitHeartNum); addPips('traitHeartP','traits',...L.traitHeartP,5);
+  addNumber('traitFlairNum','traits',...L.traitFlairNum); addPips('traitFlairP','traits',...L.traitFlairP,5);
+  addNumber('traitFocusNum','traits',...L.traitFocusNum); addPips('traitFocusP','traits',...L.traitFocusP,5);
 
-  addNumber('destiny',...L.destiny); addNumber('fateBox',...L.fateBox); addNumber('despair',...L.despair);
+  // fate boxes
+  addNumber('destiny','fate',...L.destiny); addNumber('fateBox','fate',...L.fateBox); addNumber('despair','fate',...L.despair);
 
-  addPips('defendTop',...L.defendTop,10);
-  addText('armor1',...L.armor1); addMastery('defendMastery1',...L.defendMastery1);
-  addText('armor2',...L.armor2); addMastery('defendMastery2',...L.defendMastery2);
+  // defend
+  addPips('defendTop','def',...L.defendTop,10);
+  addText('armor1','def',...L.armor1); addMastery('defendMastery1','def',...L.defendMastery1);
+  addText('armor2','def',...L.armor2); addMastery('defendMastery2','def',...L.defendMastery2);
 
-  for(let i=1;i<=5;i++){addText('m'+i,...L['m'+i]); const en=L['en'+i]; addPips('en'+i,en[0],en[1],5)}
+  // magic items + enchant pips
+  for(let i=1;i<=5;i++){addText('m'+i,'magic',...L['m'+i]); const en=L['en'+i]; addPips('en'+i,'magic',en[0],en[1],5)}
 
-  // Edit mode (fine-grained dragging of individual elements)
+  // Calibration UI bindings
+  const calEl=document.getElementById('cal');
+  const bind=(rid,nid,key)=>{const r=document.getElementById(rid), n=document.getElementById(nid);const set=v=>{CAL[key]=+v;r.value=v;n.value=v;reflow();saveCal()};r.oninput=e=>set(e.target.value);n.oninput=e=>set(e.target.value);set(CAL[key])};
+  document.getElementById('toggleCal').onclick=()=>{calEl.style.display=calEl.style.display==='none'||!calEl.style.display?'block':'none'};
+  document.getElementById('calClose').onclick=()=>calEl.style.display='none';
+  document.getElementById('calReset').onclick=()=>{CAL.ox=0;CAL.oy=0;CAL.sx=1;CAL.sy=1;CAL.ps=18;CAL.pb=2;SEC_KEYS.forEach(k=>CAL.groups[k]={ox:0,oy:0,sx:1,sy:1});applyBindings();};
+  bind('oxR','oxN','ox'); bind('oyR','oyN','oy'); bind('sxR','sxN','sx'); bind('syR','syN','sy'); bind('psR','psN','ps'); bind('pbR','pbN','pb');
+  function saveCal(){localStorage.setItem('saga_cal_groups', JSON.stringify(CAL))}
+
+  // Section specific controls
+  const sel=document.getElementById('sectionSel'); SEC_KEYS.forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;sel.appendChild(o)}); sel.value='nm';
+  function bindGroup(){const k=sel.value, G=CAL.groups[k];
+    const wire=(rid,nid,prop)=>{const r=document.getElementById(rid), n=document.getElementById(nid);const set=v=>{G[prop]=+v;r.value=v;n.value=v;reflow();saveCal()};r.oninput=e=>set(e.target.value);n.oninput=e=>set(e.target.value);set(G[prop])};
+    wire('gxR','gxN','ox'); wire('gyR','gyN','oy'); wire('gsxR','gsxN','sx'); wire('gsyR','gsyN','sy');
+  }
+  sel.onchange=bindGroup; bindGroup();
+  function applyBindings(){['oxR','oxN','oyR','oyN','sxR','sxN','syR','syN','psR','psN','pbR','pbN'].forEach(id=>document.getElementById(id).dispatchEvent(new Event('input'))); bindGroup();}
+
+  // Edit mode (fine-grained drag for individual elements if needed)
   let edit=false, dragTarget=null, ox=0, oy=0, sx=0, sy=0;
   document.getElementById('toggleEdit').addEventListener('click',()=>{edit=!edit;document.body.classList.toggle('drag-on',edit)});
   sheet.addEventListener('pointerdown',e=>{if(!edit||!e.shiftKey)return;const t=e.target.closest('.draggable');if(!t)return;dragTarget=t;sx=e.clientX;sy=e.clientY;const r=t.getBoundingClientRect();const rs=sheet.getBoundingClientRect();ox=r.left-rs.left;oy=r.top-rs.top;t.setPointerCapture(e.pointerId)});
   sheet.addEventListener('pointermove',e=>{if(!dragTarget)return;const nx=Math.min(SHEET_W-10,Math.max(0,ox+(e.clientX-sx)));const ny=Math.min(SHEET_H-10,Math.max(0,oy+(e.clientY-sy)));dragTarget.style.left=nx+'px';dragTarget.style.top=ny+'px'});
   sheet.addEventListener('pointerup',()=>{if(!dragTarget)return;dragTarget=null});
 
-  // Initial reflow to apply calibration
+  // Initial reflow
   reflow();
 
   // Export
